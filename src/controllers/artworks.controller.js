@@ -1,4 +1,3 @@
-const { ObjectId } = require('mongodb');
 const {
   createArtwork,
   getArtworkById,
@@ -10,16 +9,14 @@ const {
   downloadStreamFromBucket,
 } = require('../storage/gridfs');
 
-function validateObjectId(id) {
-  return ObjectId.isValid(id);
-}
-
 async function uploadArtwork(req, res, next) {
   if (!req.file) {
+    req.log.warn('Upload attempted without image file');
     return res.status(400).json({ error: 'Missing image upload' });
   }
 
   if (!req.file.mimetype || !req.file.mimetype.startsWith('image/')) {
+    req.log.warn({ mimetype: req.file.mimetype }, 'Upload rejected due to unsupported mime type');
     return res.status(400).json({ error: 'Only image uploads are supported' });
   }
 
@@ -36,6 +33,7 @@ async function uploadArtwork(req, res, next) {
       formats: document.formats,
     });
   } catch (error) {
+    req.log.error({ err: error }, 'Failed to upload artwork');
     next(error);
   }
 }
@@ -43,10 +41,6 @@ async function uploadArtwork(req, res, next) {
 async function getArtworkStream(req, res, next) {
   const { id } = req.params;
   const variant = (req.query.variant || 'original').toString();
-
-  if (!validateObjectId(id)) {
-    return res.status(400).json({ error: 'Invalid artwork id' });
-  }
 
   try {
     const doc = await getArtworkById(id);
@@ -83,7 +77,7 @@ async function getArtworkStream(req, res, next) {
 
     const stream = downloadStreamFromBucket(selection.bucket, selection.fileId);
     stream.on('error', (err) => {
-      console.error('Error streaming file', err);
+      req.log.error({ err, artworkId: id, variant }, 'Error streaming file');
       if (!res.headersSent) {
         res.status(404).end();
       } else {
@@ -92,15 +86,13 @@ async function getArtworkStream(req, res, next) {
     });
     stream.pipe(res);
   } catch (error) {
+    req.log.error({ err: error, artworkId: id }, 'Failed to stream artwork');
     next(error);
   }
 }
 
 async function getArtworkMetadata(req, res, next) {
   const { id } = req.params;
-  if (!validateObjectId(id)) {
-    return res.status(400).json({ error: 'Invalid artwork id' });
-  }
 
   try {
     const doc = await getArtworkById(id);
@@ -109,33 +101,27 @@ async function getArtworkMetadata(req, res, next) {
     }
     res.json(doc);
   } catch (error) {
+    req.log.error({ err: error, artworkId: id }, 'Failed to retrieve artwork metadata');
     next(error);
   }
 }
 
 async function search(req, res, next) {
-  const limitParam = Number.parseInt(req.query.limit, 10);
-  const skipParam = Number.parseInt(req.query.skip, 10);
-  const limit = Number.isNaN(limitParam) ? 20 : Math.min(Math.max(limitParam, 1), 100);
-  const skip = Number.isNaN(skipParam) ? 0 : Math.max(skipParam, 0);
-  const tags = req.query.tags
-    ? req.query.tags
-        .toString()
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter(Boolean)
-    : [];
+  const limit = typeof req.query.limit === 'number' ? req.query.limit : 20;
+  const skip = typeof req.query.skip === 'number' ? req.query.skip : 0;
+  const tags = Array.isArray(req.query.tags) ? req.query.tags : [];
 
   try {
     const results = await searchArtworks({
-      artist: req.query.artist ? req.query.artist.toString() : undefined,
+      artist: req.query.artist,
       tags,
-      text: req.query.q ? req.query.q.toString() : undefined,
+      text: req.query.q,
       limit,
       skip,
     });
     res.json({ items: results, count: results.length });
   } catch (error) {
+    req.log.error({ err: error, query: req.query }, 'Failed to search artworks');
     next(error);
   }
 }
@@ -146,3 +132,4 @@ module.exports = {
   getArtworkMetadata,
   search,
 };
+
