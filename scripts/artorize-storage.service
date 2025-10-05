@@ -1,0 +1,38 @@
+[Unit]
+Description=Artorize Storage Backend API
+Documentation=https://github.com/Artorize/artorize-backend
+After=network.target mongodb.service
+Wants=mongodb.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/artorize-storage-backend
+ExecStart=/usr/bin/node /opt/artorize-storage-backend/src/server.js --config=/opt/artorize-storage-backend/config/runtime.json
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=artorize-storage
+Environment="NODE_ENV=production"
+
+# Performance tuning
+LimitNOFILE=65535
+Environment="UV_THREADPOOL_SIZE=128"
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/artorize-storage-backend/config
+ReadWritePaths=/opt/artorize-storage-backend/logs
+
+# Process management
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
