@@ -1,21 +1,46 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV_FILE="${ENV_FILE:-.env.production}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+CONFIG_DIR="$PROJECT_ROOT/config"
+CONFIG_FILE="$CONFIG_DIR/runtime.json"
+CONFIG_ARG="--config=$CONFIG_FILE"
 
-if [ ! -f "$ENV_FILE" ]; then
-  echo "Missing environment file '$ENV_FILE'. Set ENV_FILE or create it before deploying." >&2
-  exit 1
+mkdir -p "$CONFIG_DIR"
+
+if [ ! -f "$CONFIG_FILE" ]; then
+  cat > "$CONFIG_FILE" <<'EOF'
+{
+  "environment": "production",
+  "port": 3000,
+  "mongo": {
+    "uri": "mongodb://localhost:27017",
+    "dbName": "artgallery"
+  },
+  "logLevel": "info"
+}
+EOF
+  echo "Created default configuration at $CONFIG_FILE"
+  echo "Update database credentials in the generated file before rerunning if needed."
 fi
 
-export ENV_FILE
-export NODE_ENV="${NODE_ENV:-production}"
+cd "$PROJECT_ROOT"
 
-echo "Installing dependencies..."
-npm ci
+if [ "${SKIP_INSTALL:-0}" != "1" ]; then
+  echo "Installing dependencies..."
+  npm ci
+else
+  echo "Skipping dependency installation (SKIP_INSTALL=$SKIP_INSTALL)"
+fi
 
-echo "Applying database indexes..."
-node scripts/ensure-indexes.js
+echo "Ensuring MongoDB indexes..."
+node scripts/ensure-indexes.js "$CONFIG_ARG"
+
+if [ "${SKIP_SERVER_START:-0}" = "1" ]; then
+  echo "Skipping API server start (SKIP_SERVER_START=$SKIP_SERVER_START)"
+  exit 0
+fi
 
 echo "Starting API server..."
-npm run start:prod
+exec node src/server.js "$CONFIG_ARG"

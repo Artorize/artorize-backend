@@ -6,8 +6,13 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "echo \"No automated tests yet\"",
-    "deploy": "bash scripts/deploy.sh",
+    "test": "mocha tests/**/*.test.js --timeout 10000 --exit",
+    "test:watch": "mocha tests/**/*.test.js --watch",
+    "test:coverage": "nyc --reporter=html --reporter=text mocha tests/**/*.test.js --timeout 10000 --exit",
+    "test:fixtures": "node tests/fixtures/generate-fixtures.js",
+    "mongo:memory": "node scripts/dev-memory-mongo.js",
+    "deploy": "node scripts/run-deploy.js",
+    "seed:inputdata": "node scripts/seed-inputdata.js --config=config/runtime.json",
     "start:prod": "cross-env NODE_ENV=production node src/server.js"
   },
   "keywords": [],
@@ -15,19 +20,24 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "express-rate-limit": "^7.2.0",
+    "helmet": "^7.1.0",
     "mongodb": "^6.8.0",
     "multer": "^2.0.2",
-    "sharp": "^0.33.4",
-    "express-rate-limit": "^7.2.0",
     "pino": "^9.3.2",
     "pino-http": "^10.3.0",
-    "helmet": "^7.1.0",
+    "sharp": "^0.33.4",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "chai": "^4.3.10",
+    "cross-env": "^7.0.3",
+    "mocha": "^10.2.0",
+    "mongodb-memory-server": "^10.2.1",
     "nodemon": "^3.1.4",
-    "cross-env": "^7.0.3"
+    "nyc": "^15.1.0",
+    "supertest": "^6.3.3",
+    "tslib": "^2.8.1"
   }
 }

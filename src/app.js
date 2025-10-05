@@ -2,6 +2,7 @@ const express = require('express');
 const helmet = require('helmet');
 const pinoHttp = require('pino-http');
 const artworksRouter = require('./routes/artworks.routes');
+const similarityRouter = require('./routes/similarity.routes');
 const { notFound, errorHandler } = require('./middlewares/errorHandler');
 const { generalLimiter } = require('./middlewares/rateLimit');
 const logger = require('./config/logger');
@@ -20,6 +21,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/artworks', artworksRouter);
+app.use('/artworks', similarityRouter);
 app.use(notFound);
 app.use(errorHandler);
 

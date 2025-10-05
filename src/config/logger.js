@@ -1,14 +1,8 @@
 const pino = require('pino');
-
-function resolveLogLevel() {
-  if (process.env.LOG_LEVEL) {
-    return process.env.LOG_LEVEL;
-  }
-  return process.env.NODE_ENV === 'production' ? 'info' : 'debug';
-}
+const config = require('./env');
 
 const logger = pino({
-  level: resolveLogLevel(),
+  level: config.logLevel,
   redact: {
     paths: ['req.headers.authorization'],
     remove: true,
@@ -16,4 +10,3 @@ const logger = pino({
 });
 
 module.exports = logger;
-

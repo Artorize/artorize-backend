@@ -1,4 +1,3 @@
-const path = require('path');
 const os = require('os');
 const { Readable } = require('stream');
 const sharp = require('sharp');
@@ -6,11 +5,14 @@ const { ObjectId } = require('mongodb');
 const { getDb } = require('../config/mongo');
 const {
   getOriginalBucket,
-  getVariantsBucket,
+  getProtectedBucket,
+  getMaskBucket,
   uploadStreamToBucket,
   deleteFileFromBucket,
 } = require('../storage/gridfs');
 const { sha256FromBuffer } = require('../utils/checksum');
+const { processHashesForStorage } = require('./hash-storage.service');
+const { parseSAC } = require('./sac-encoder.service');
 
 const cpuCount = typeof os.availableParallelism === 'function'
   ? os.availableParallelism()
@@ -47,56 +49,120 @@ function parseExtra(extra) {
   }
 }
 
-async function createArtwork({ fileBuffer, originalName, mimeType, body }) {
-  if (!fileBuffer) {
-    const err = new Error('Missing file buffer');
+function ensureFilePresence(file, label) {
+  if (!file || !file.buffer) {
+    const err = new Error(`Missing ${label}`);
+    err.status = 400;
+    throw err;
+  }
+}
+
+function resolveFilename(originalName, fallback) {
+  return originalName && typeof originalName === 'string' && originalName.trim().length
+    ? originalName
+    : fallback;
+}
+
+async function createArtwork({
+  originalFile,
+  protectedFile,
+  maskHiFile,
+  maskLoFile,
+  analysisJson,
+  summaryJson,
+  body = {},
+}) {
+  ensureFilePresence(originalFile, 'original image');
+  ensureFilePresence(protectedFile, 'protected image');
+  ensureFilePresence(maskHiFile, 'maskHi file');
+  ensureFilePresence(maskLoFile, 'maskLo file');
+
+  const originalBuffer = Buffer.isBuffer(originalFile.buffer)
+    ? originalFile.buffer
+    : Buffer.from(originalFile.buffer);
+  const protectedBuffer = Buffer.isBuffer(protectedFile.buffer)
+    ? protectedFile.buffer
+    : Buffer.from(protectedFile.buffer);
+  const maskHiBuffer = Buffer.isBuffer(maskHiFile.buffer)
+    ? maskHiFile.buffer
+    : Buffer.from(maskHiFile.buffer);
+  const maskLoBuffer = Buffer.isBuffer(maskLoFile.buffer)
+    ? maskLoFile.buffer
+    : Buffer.from(maskLoFile.buffer);
+
+  // Validate SAC v1 format for masks
+  try {
+    parseSAC(maskHiBuffer);
+  } catch (error) {
+    const err = new Error(`Invalid SAC format for maskHi: ${error.message}`);
     err.status = 400;
     throw err;
   }
 
-  const buffer = Buffer.isBuffer(fileBuffer) ? fileBuffer : Buffer.from(fileBuffer);
-  const checksum = sha256FromBuffer(buffer);
-  const bytes = buffer.length;
-  const originalFilename = originalName || 'upload';
-  const baseName = path.parse(originalFilename).name;
-  const resolvedMimeType = mimeType || 'application/octet-stream';
+  try {
+    parseSAC(maskLoBuffer);
+  } catch (error) {
+    const err = new Error(`Invalid SAC format for maskLo: ${error.message}`);
+    err.status = 400;
+    throw err;
+  }
 
-  const originalBucket = getOriginalBucket();
-  const variantsBucket = getVariantsBucket();
+  const originalFilename = resolveFilename(originalFile.originalname, 'original-image');
+  const protectedFilename = resolveFilename(protectedFile.originalname, 'protected-image');
+  const maskHiFilename = resolveFilename(maskHiFile.originalname, 'mask-hi.sac');
+  const maskLoFilename = resolveFilename(maskLoFile.originalname, 'mask-lo.sac');
 
-  const baseImage = sharp(buffer, { failOnError: false });
+  const originalMimeType = originalFile.mimetype || 'application/octet-stream';
+  const protectedMimeType = protectedFile.mimetype || 'application/octet-stream';
+  const maskHiMimeType = 'application/octet-stream'; // SAC v1 format
+  const maskLoMimeType = 'application/octet-stream'; // SAC v1 format
 
-  const [metaInfo, webpBuffer, thumbnailBuffer] = await Promise.all([
-    baseImage.clone().metadata(),
-    baseImage.clone().webp({ quality: 90 }).toBuffer(),
-    baseImage
-      .clone()
-      .resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 80 })
-      .toBuffer(),
-  ]);
+  const originalChecksum = sha256FromBuffer(originalBuffer);
+  const protectedChecksum = sha256FromBuffer(protectedBuffer);
+  const maskHiChecksum = sha256FromBuffer(maskHiBuffer);
+  const maskLoChecksum = sha256FromBuffer(maskLoBuffer);
+
+  const baseImage = sharp(originalBuffer, { failOnError: false });
+  const metaInfo = await baseImage.metadata();
 
   const uploadPlan = [
     {
       key: 'original',
-      bucket: originalBucket,
+      bucket: getOriginalBucket(),
+      bucketKey: 'originals',
       filename: originalFilename,
-      contentType: resolvedMimeType,
-      data: buffer,
+      contentType: originalMimeType,
+      data: originalBuffer,
+      checksum: originalChecksum,
     },
     {
-      key: 'webp',
-      bucket: variantsBucket,
-      filename: `${baseName}.webp`,
-      contentType: 'image/webp',
-      data: webpBuffer,
+      key: 'protected',
+      bucket: getProtectedBucket(),
+      bucketKey: 'protected',
+      filename: protectedFilename,
+      contentType: protectedMimeType,
+      data: protectedBuffer,
+      checksum: protectedChecksum,
+    },
+    // Masks are stored in SAC v1 binary format
+    // SAC = Simple Array Container - compact binary protocol for int16 arrays
+    {
+      key: 'mask_hi',
+      bucket: getMaskBucket(),
+      bucketKey: 'masks',
+      filename: maskHiFilename,
+      contentType: maskHiMimeType,
+      data: maskHiBuffer,
+      checksum: maskHiChecksum,
     },
     {
-      key: 'thumbnail',
-      bucket: variantsBucket,
-      filename: `${baseName}-thumbnail.webp`,
-      contentType: 'image/webp',
-      data: thumbnailBuffer,
+      key: 'mask_lo',
+      bucket: getMaskBucket(),
+      bucketKey: 'masks',
+      filename: maskLoFilename,
+      contentType: maskLoMimeType,
+      data: maskLoBuffer,
+      checksum: maskLoChecksum,
     },
   ];
 
@@ -119,11 +185,20 @@ async function createArtwork({ fileBuffer, originalName, mimeType, body }) {
           : Promise.resolve(),
       ),
     );
-    throw failed.reason || new Error('Failed to upload image');
+    throw failed.reason || new Error('Failed to upload artwork assets');
   }
 
   const formats = uploadResults.reduce((acc, result, index) => {
-    acc[uploadPlan[index].key] = result.value;
+    if (result.status !== 'fulfilled') return acc;
+    const plan = uploadPlan[index];
+    acc[plan.key] = {
+      fileId: result.value,
+      bucket: plan.bucketKey,
+      contentType: plan.contentType,
+      filename: plan.filename,
+      bytes: plan.data.length,
+      checksum: plan.checksum,
+    };
     return acc;
   }, {});
 
@@ -135,16 +210,33 @@ async function createArtwork({ fileBuffer, originalName, mimeType, body }) {
     createdAt: safeDate(body.createdAt),
     width: metaInfo.width || null,
     height: metaInfo.height || null,
-    mimeType: resolvedMimeType,
-    bytes,
-    checksum,
+    mimeType: originalMimeType,
+    bytes: originalBuffer.length,
+    checksum: originalChecksum,
     formats,
+    analysis: analysisJson || null,
+    summary: summaryJson || null,
     extra: parseExtra(body.extra),
     uploadedAt: new Date(),
   };
 
+  // Process and add hashes if provided
+  if (body.hashes) {
+    const hashData = processHashesForStorage(body.hashes);
+    if (hashData) {
+      document.hashes = hashData.hashes;
+      document.hash_metadata = hashData.hash_metadata;
+    }
+  }
+
   if (typeof document.extra === 'undefined') {
     delete document.extra;
+  }
+  if (!document.analysis) {
+    delete document.analysis;
+  }
+  if (!document.summary) {
+    delete document.summary;
   }
 
   const db = getDb();
@@ -177,8 +269,110 @@ async function searchArtworks({ artist, tags, text, limit = 20, skip = 0 }) {
     .toArray();
 }
 
+async function getArtworksByIds(ids, fields) {
+  const db = getDb();
+  const collection = db.collection('artworks_meta');
+
+  const objectIds = ids.map(id => {
+    try {
+      return new ObjectId(id);
+    } catch (e) {
+      return null;
+    }
+  }).filter(Boolean);
+
+  const projection = fields ?
+    fields.split(',').reduce((acc, field) => {
+      acc[field.trim()] = 1;
+      return acc;
+    }, { _id: 1 }) : {};
+
+  const artworks = await collection.find(
+    { _id: { $in: objectIds } },
+    { projection }
+  ).toArray();
+
+  return artworks;
+}
+
+async function getAllVariants(artworkId) {
+  const artwork = await getArtworkById(artworkId);
+  if (!artwork) return null;
+
+  const variants = {};
+  for (const [key, format] of Object.entries(artwork.formats || {})) {
+    variants[key] = {
+      contentType: format.contentType,
+      size: format.size,
+      checksum: format.checksum,
+      fileId: format.fileId,
+      bucket: format.bucket,
+    };
+  }
+
+  return variants;
+}
+
+async function checkArtworkExists({ id, checksum, title, artist, tags }) {
+  const db = getDb();
+  const collection = db.collection('artworks_meta');
+
+  const queries = [];
+
+  if (id) {
+    try {
+      queries.push({ _id: new ObjectId(id) });
+    } catch (e) {
+      // Invalid ObjectId format
+    }
+  }
+
+  if (checksum) {
+    queries.push({ checksum: checksum });
+  }
+
+  if (title && artist) {
+    queries.push({
+      title: title,
+      artist: artist
+    });
+  }
+
+  if (tags && Array.isArray(tags) && tags.length > 0) {
+    queries.push({ tags: { $all: tags } });
+  }
+
+  if (queries.length === 0) {
+    return { exists: false, matches: [] };
+  }
+
+  const matches = await collection.find(
+    { $or: queries },
+    {
+      projection: {
+        _id: 1,
+        title: 1,
+        artist: 1,
+        checksum: 1,
+        tags: 1,
+        uploadedAt: 1,
+        createdAt: 1
+      }
+    }
+  ).toArray();
+
+  return {
+    exists: matches.length > 0,
+    matches: matches,
+    matchCount: matches.length
+  };
+}
+
 module.exports = {
   createArtwork,
   getArtworkById,
   searchArtworks,
+  getArtworksByIds,
+  getAllVariants,
+  checkArtworkExists,
 };

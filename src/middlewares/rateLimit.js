@@ -16,8 +16,17 @@ const uploadLimiter = rateLimit({
   message: { error: 'Upload limit exceeded. Try again later.' },
 });
 
+const similaritySearchLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Similarity search limit exceeded. Try again later.' },
+});
+
 module.exports = {
   generalLimiter,
   uploadLimiter,
+  similaritySearchLimiter,
 };
 

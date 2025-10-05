@@ -2,26 +2,37 @@ const { GridFSBucket, ObjectId } = require('mongodb');
 const { getDb } = require('../config/mongo');
 
 let originalBucket;
-let variantsBucket;
+let protectedBucket;
+let maskBucket;
 
 function getOriginalBucket() {
   if (!originalBucket) {
     originalBucket = new GridFSBucket(getDb(), {
-      bucketName: 'artworks',
+      bucketName: 'artwork_originals',
       chunkSizeBytes: 1024 * 1024,
     });
   }
   return originalBucket;
 }
 
-function getVariantsBucket() {
-  if (!variantsBucket) {
-    variantsBucket = new GridFSBucket(getDb(), {
-      bucketName: 'artwork_variants',
+function getProtectedBucket() {
+  if (!protectedBucket) {
+    protectedBucket = new GridFSBucket(getDb(), {
+      bucketName: 'artwork_protected',
       chunkSizeBytes: 1024 * 1024,
     });
   }
-  return variantsBucket;
+  return protectedBucket;
+}
+
+function getMaskBucket() {
+  if (!maskBucket) {
+    maskBucket = new GridFSBucket(getDb(), {
+      bucketName: 'artwork_masks',
+      chunkSizeBytes: 1024 * 1024,
+    });
+  }
+  return maskBucket;
 }
 
 function uploadStreamToBucket(bucket, stream, { filename, contentType }) {
@@ -47,7 +58,8 @@ function deleteFileFromBucket(bucket, id) {
 
 module.exports = {
   getOriginalBucket,
-  getVariantsBucket,
+  getProtectedBucket,
+  getMaskBucket,
   uploadStreamToBucket,
   downloadStreamFromBucket,
   deleteFileFromBucket,
