@@ -28,11 +28,136 @@ curl http://localhost:3000/artworks/{id}?variant=original
 
 ## Authentication
 
-Currently no authentication required. All endpoints are public.
+The backend uses **token-based authentication** for secure processor integration.
+
+### How It Works
+
+1. **Router generates a token** via `POST /tokens` endpoint
+2. **Router passes token to both processor and backend**
+3. **Processor includes token** in `Authorization: Bearer <token>` header when uploading
+4. **Token is consumed** (single-use) on first successful upload
+5. **Expired/used tokens are rejected** with 401 status
+
+### Security Benefits
+
+- **One-time tokens**: Each token can only be used once, preventing replay attacks
+- **Time-limited**: Tokens expire after 1 hour (configurable)
+- **Per-artwork isolation**: Compromised token affects only one artwork
+- **No static credentials**: Eliminates risk of leaked API keys destroying everything
+
+### Protected Endpoints
+
+- `POST /artworks` - **Requires authentication** (token is consumed)
+
+### Public Endpoints
+
+All read endpoints remain public:
+- `GET /artworks/*` - Search, metadata, file streaming
+- `GET /health` - Health checks
+
+---
+
+## Processor Integration
+
+This backend is designed to support **direct processor uploads** in the Artorize architecture with secure token-based authentication:
+
+**Workflow**:
+1. Router receives artwork submission request
+2. **Router generates authentication token** via `POST /tokens`
+3. **Router passes token to both processor and backend**
+4. Processor receives image and token from router
+5. Processor generates all variants (original, protected, masks, analysis, summary)
+6. **Processor uploads directly to `POST /artworks`** with `Authorization: Bearer <token>` header
+7. Backend validates and consumes token (single-use)
+8. Backend returns `id` in response (MongoDB ObjectId)
+9. Processor sends `id` to router in callback
+10. Router uses `id` to retrieve files when needed
+
+**Key Points**:
+- ✅ Secure token-based authentication (one-time use)
+- ✅ Per-artwork token isolation limits breach impact
+- ✅ All required files and metadata are supported
+- ✅ Returns `id` field that processor needs for callbacks
+- ✅ Handles large files (256MB max) efficiently
+- ✅ Rate limiting configured (30 uploads/hour per IP)
+- ✅ No temporary storage needed in router
+- ✅ Tokens expire after 1 hour (configurable)
+- ✅ Automatic cleanup of expired/used tokens
+
+**Security Architecture**:
+- Each artwork gets a unique 16-character token
+- Tokens are cryptographically random and single-use
+- Compromised token only affects one artwork
+- No static credentials to leak or crack
 
 ---
 
 ## Endpoints
+
+### Authentication Endpoints
+
+### `POST /tokens`
+Generate a new authentication token (called by router).
+
+**Request Body** (optional):
+```json
+{
+  "artworkId": "60f7b3b3b3b3b3b3b3b3b3b3",
+  "expiresIn": 3600000,
+  "metadata": { "source": "router" }
+}
+```
+
+- `artworkId` (optional) - Associate token with specific artwork
+- `expiresIn` (optional) - Expiration time in milliseconds (default: 1 hour, max: 24 hours)
+- `metadata` (optional) - Additional metadata to store with token
+
+**Response**: `201 Created`
+```json
+{
+  "token": "a1b2c3d4e5f6g7h8",
+  "tokenId": "60f7b3b3b3b3b3b3b3b3b3b5",
+  "artworkId": "60f7b3b3b3b3b3b3b3b3b3b3",
+  "expiresAt": "2023-07-21T10:15:00.000Z",
+  "createdAt": "2023-07-21T09:15:00.000Z"
+}
+```
+
+---
+
+### `DELETE /tokens/:token`
+Revoke a token (mark as used).
+
+**Response**: `200 OK`
+```json
+{
+  "success": true,
+  "message": "Token revoked successfully"
+}
+```
+
+**Errors**:
+- `404` - Token not found or already revoked
+
+---
+
+### `GET /tokens/stats`
+Get token statistics (monitoring).
+
+**Response**: `200 OK`
+```json
+{
+  "stats": {
+    "total": 150,
+    "active": 5,
+    "used": 120,
+    "expired": 25
+  },
+  "timestamp": "2023-07-21T09:15:00.000Z"
+}
+```
+
+---
 
 ### `GET /health`
 Service health status.
@@ -46,6 +171,9 @@ Service health status.
 
 ### `POST /artworks`
 Upload artwork with multiple file variants.
+
+**Authentication**: Required
+**Header**: `Authorization: Bearer <token>`
 
 **Content-Type**: `multipart/form-data`
 
@@ -75,13 +203,19 @@ Upload artwork with multiple file variants.
       "bytes": 1048576,
       "checksum": "sha256:abc123...",
       "fileId": "60f7b3b3b3b3b3b3b3b3b3b4"
-    }
+    },
+    "protected": { /* ... */ },
+    "mask_hi": { /* ... */ },
+    "mask_lo": { /* ... */ }
   }
 }
 ```
 
+**Important**: The `id` field in the response is a MongoDB ObjectId that **must be used by the processor in callbacks** to the router. This allows the router to retrieve artwork files using other endpoints.
+
 **Errors**:
 - `400` - Missing files, invalid types, malformed JSON
+- `401` - Missing/invalid/expired authentication token
 - `429` - Rate limit exceeded
 
 ---
@@ -94,10 +228,12 @@ Stream artwork file.
 
 **Response**: `200 OK`
 - Binary file stream with proper MIME type
-- For `mask_hi` and `mask_lo`: returns SAC v1 binary format (application/octet-stream)
 - For images: returns JPEG/PNG/WebP/etc. as appropriate
+- For masks: returns SAC v1 binary format (application/octet-stream)
 - Cache headers: `public, max-age=31536000, immutable`
 - ETag: `{id}-{variant}`
+
+**Note**: For mask files, prefer using the dedicated `/artworks/{id}/mask` endpoint with the `resolution` parameter.
 
 **Errors**:
 - `400` - Invalid ID format
@@ -154,6 +290,36 @@ Available variant information.
   }
 }
 ```
+
+---
+
+### `GET /artworks/{id}/mask`
+Stream artwork mask file in SAC v1 binary format.
+
+**Parameters**:
+- `resolution` (query) - `hi|lo` (default: `hi`)
+
+**Response**: `200 OK`
+- Binary SAC v1 file stream (application/octet-stream)
+- Cache headers: `public, max-age=31536000, immutable`
+- ETag: `{id}-mask_{resolution}`
+- Content-Disposition: `inline; filename="{title}-mask-{resolution}.sac"`
+
+**Example**:
+```bash
+# Get high-resolution mask (default)
+curl http://localhost:3000/artworks/{id}/mask
+
+# Get low-resolution mask
+curl http://localhost:3000/artworks/{id}/mask?resolution=lo
+
+# Save to file
+curl http://localhost:3000/artworks/{id}/mask -o mask.sac
+```
+
+**Errors**:
+- `400` - Invalid ID format
+- `404` - Artwork not found or mask not available
 
 ---
 
@@ -288,6 +454,7 @@ All errors return JSON:
 
 **Status Codes**:
 - `400` - Bad Request (validation errors, malformed data)
+- `401` - Unauthorized (missing, invalid, or expired authentication token)
 - `404` - Not Found (artwork/variant doesn't exist)
 - `429` - Too Many Requests (rate limit exceeded)
 - `500` - Internal Server Error
@@ -344,9 +511,22 @@ Masks use the Simple Array Container (SAC) v1 protocol - a compact binary format
 
 ## Examples
 
-### Upload Example
+### Complete Workflow Example
+
 ```bash
+# Step 1: Router generates a token
+TOKEN_RESPONSE=$(curl -X POST http://localhost:3000/tokens \
+  -H "Content-Type: application/json" \
+  -d '{"metadata": {"source": "router"}}')
+
+TOKEN=$(echo $TOKEN_RESPONSE | jq -r '.token')
+echo "Generated token: $TOKEN"
+
+# Step 2: Router passes token to processor (and to backend for reference)
+
+# Step 3: Processor uploads artwork with the token
 curl -X POST http://localhost:3000/artworks \
+  -H "Authorization: Bearer $TOKEN" \
   -F "original=@image.jpg" \
   -F "protected=@protected.jpg" \
   -F "maskHi=@mask_hi.sac" \
@@ -356,9 +536,45 @@ curl -X POST http://localhost:3000/artworks \
   -F "title=My Artwork" \
   -F "artist=Artist Name" \
   -F "tags=abstract,modern"
+
+# Response contains the artwork ID
+# {
+#   "id": "671924a5c3d8e8f9a1b2c3d4",
+#   "formats": { ... }
+# }
 ```
 
 **Note**: Mask files must be in SAC v1 binary format. You can generate them using the Python code provided in `sac_v_1_cdn_mask_transfer_protocol.md`.
+
+### Processor Upload Example
+```bash
+# Step 1: Get token from router (router already generated it)
+TOKEN="a1b2c3d4e5f6g7h8"
+
+# Step 2: Processor uploads after processing artwork
+curl -X POST http://localhost:3000/artworks \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "original=@mona_lisa.jpg;type=image/jpeg" \
+  -F "protected=@mona_lisa_protected.jpg;type=image/jpeg" \
+  -F "maskHi=@mask_hi.sac;type=application/octet-stream" \
+  -F "maskLo=@mask_lo.sac;type=application/octet-stream" \
+  -F "analysis=@analysis.json;type=application/json" \
+  -F "summary=@summary.json;type=application/json" \
+  -F "title=Mona Lisa" \
+  -F "artist=Leonardo da Vinci" \
+  -F "description=Famous Renaissance portrait" \
+  -F "tags=renaissance,portrait,famous" \
+  -F "createdAt=1503-01-01T00:00:00Z" \
+  -F "extra={\"processing_time_ms\":64000}"
+
+# Response contains the artwork ID
+# {
+#   "id": "671924a5c3d8e8f9a1b2c3d4",
+#   "formats": { ... }
+# }
+
+# Step 3: Processor sends this ID to router in callback for retrieval
+```
 
 ### Search Example
 ```bash
@@ -373,6 +589,18 @@ curl "http://localhost:3000/artworks?tags=abstract,modern"
 
 # Combined with pagination
 curl "http://localhost:3000/artworks?artist=Picasso&limit=10&skip=20"
+```
+
+### Mask Retrieval Example
+```bash
+# Get high-resolution mask (default)
+curl "http://localhost:3000/artworks/{id}/mask" -o mask-hi.sac
+
+# Get low-resolution mask
+curl "http://localhost:3000/artworks/{id}/mask?resolution=lo" -o mask-lo.sac
+
+# Alternative: using variant parameter (legacy)
+curl "http://localhost:3000/artworks/{id}?variant=mask_hi" -o mask-hi.sac
 ```
 
 ### Check Existence Example

@@ -69,6 +69,7 @@ The following indexes are auto-created on startup:
 ### API Endpoints
 - `POST /artworks` - Upload artwork with multiple file variants
 - `GET /artworks/:id` - Stream artwork file (use `?variant=` query param)
+- `GET /artworks/:id/mask` - Stream mask file in SAC v1 format (use `?resolution=hi|lo`)
 - `GET /artworks/:id/metadata` - Get artwork metadata
 - `GET /artworks` - Search artworks (supports artist, tags, text queries)
 - `GET /artworks/check-exists` - Check if artwork already exists (supports id, checksum, title+artist, tags)

@@ -119,6 +119,17 @@ const downloadUrlQuerySchema = z.object({
     .optional(),
 });
 
+const maskQuerySchema = z.object({
+  resolution: z
+    .preprocess((value) => {
+      if (typeof value === 'string') {
+        return value.trim().toLowerCase();
+      }
+      return 'hi'; // Default to high resolution
+    }, z.enum(['hi', 'lo']))
+    .optional(),
+});
+
 const checkExistsQuerySchema = z.object({
   id: z
     .string()
@@ -157,4 +168,5 @@ module.exports = {
   batchArtworksSchema: { body: batchBodySchema },
   downloadUrlSchema: { params: idParamSchema, query: downloadUrlQuerySchema },
   checkExistsSchema: { query: checkExistsQuerySchema },
+  maskSchema: { params: idParamSchema, query: maskQuerySchema },
 };

@@ -14,6 +14,11 @@ async function ensureIndexes() {
     db.collection('artworks_meta').createIndex({ 'hashes.color_hash_int': 1 }),
     db.collection('artworks_meta').createIndex({ 'hashes.blockhash8_int': 1 }),
     db.collection('artworks_meta').createIndex({ 'hashes.blockhash16_int': 1 }),
+    // Token indexes for authentication
+    db.collection('auth_tokens').createIndex({ token: 1 }, { unique: true }),
+    db.collection('auth_tokens').createIndex({ expiresAt: 1 }),
+    db.collection('auth_tokens').createIndex({ used: 1, expiresAt: 1 }),
+    db.collection('auth_tokens').createIndex({ artworkId: 1 }, { sparse: true }),
   ]);
 }
 
