@@ -10,9 +10,11 @@ const {
   getArtworkDownloadUrl,
   downloadArtwork,
   checkExists,
+  getMask,
 } = require('../controllers/artworks.controller');
 const { uploadLimiter } = require('../middlewares/rateLimit');
 const { validateRequest } = require('../middlewares/validateRequest');
+const { authenticate } = require('../middlewares/auth');
 const {
   uploadArtworkSchema,
   artworkStreamSchema,
@@ -21,6 +23,7 @@ const {
   batchArtworksSchema,
   downloadUrlSchema,
   checkExistsSchema,
+  maskSchema,
 } = require('../validators/artwork.validators');
 
 const ALLOWED_IMAGE_TYPES = new Set([
@@ -88,10 +91,11 @@ const uploadFields = upload.fields([
   { name: 'summary', maxCount: 1 },
 ]);
 
-// Upload endpoint
+// Upload endpoint (requires authentication)
 router.post(
   '/',
   uploadLimiter,
+  authenticate({ consume: true }),
   uploadFields,
   validateRequest(uploadArtworkSchema),
   uploadArtwork,
@@ -115,6 +119,11 @@ router.get(
   '/:id/variants',
   validateRequest(artworkMetadataSchema),
   getArtworkVariants,
+);
+router.get(
+  '/:id/mask',
+  validateRequest(maskSchema),
+  getMask,
 );
 router.get(
   '/:id/download-url',

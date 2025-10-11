@@ -329,6 +329,44 @@ async function checkExists(req, res, next) {
   }
 }
 
+async function getMask(req, res, next) {
+  const { id } = req.params;
+  const resolution = req.query.resolution || 'hi';
+  const variant = `mask_${resolution}`;
+
+  try {
+    const doc = await getArtworkById(id);
+    if (!doc) {
+      return res.status(404).json({ error: 'Artwork not found' });
+    }
+
+    const format = doc.formats?.[variant];
+    if (!format || !format.fileId) {
+      return res.status(404).json({ error: `Mask with resolution '${resolution}' not available` });
+    }
+
+    const bucket = getMaskBucket();
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('ETag', `${doc._id}-${variant}`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${doc.title || 'artwork'}-mask-${resolution}.sac"`);
+
+    const stream = downloadStreamFromBucket(bucket, format.fileId);
+    stream.on('error', (err) => {
+      req.log.error({ err, artworkId: id, resolution }, 'Error streaming mask file');
+      if (!res.headersSent) {
+        res.status(404).end();
+      } else {
+        res.end();
+      }
+    });
+    stream.pipe(res);
+  } catch (error) {
+    req.log.error({ err: error, artworkId: id, resolution }, 'Failed to stream mask');
+    next(error);
+  }
+}
+
 module.exports = {
   uploadArtwork,
   getArtworkStream,
@@ -339,4 +377,5 @@ module.exports = {
   getArtworkDownloadUrl,
   downloadArtwork,
   checkExists,
+  getMask,
 };
