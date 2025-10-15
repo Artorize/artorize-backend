@@ -43,13 +43,9 @@ const FILE_RULES = {
     mimeTypes: ALLOWED_IMAGE_TYPES,
     label: 'protected image',
   },
-  maskHi: {
+  mask: {
     mimeTypes: new Set(['application/octet-stream']),
-    label: 'maskHi asset (SAC v1)',
-  },
-  maskLo: {
-    mimeTypes: new Set(['application/octet-stream']),
-    label: 'maskLo asset (SAC v1)',
+    label: 'mask asset (SAC v1)',
   },
   analysis: {
     mimeTypes: new Set(['application/json']),
@@ -85,8 +81,7 @@ const router = express.Router();
 const uploadFields = upload.fields([
   { name: 'original', maxCount: 1 },
   { name: 'protected', maxCount: 1 },
-  { name: 'maskHi', maxCount: 1 },
-  { name: 'maskLo', maxCount: 1 },
+  { name: 'mask', maxCount: 1 },
   { name: 'analysis', maxCount: 1 },
   { name: 'summary', maxCount: 1 },
 ]);

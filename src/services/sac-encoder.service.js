@@ -5,13 +5,18 @@ const DTYPE_INT16 = 1;
 const ARRAYS_COUNT = 2;
 const HEADER_SIZE = 24;
 
+// SAC v1.1 flags
+const FLAG_SINGLE_ARRAY = 0x01; // Indicates arrayB is identical to arrayA and omitted
+
 /**
- * Encodes two int16 arrays into SAC v1 binary format
+ * Encodes two int16 arrays into SAC v1.1 binary format
+ * Supports FLAG_SINGLE_ARRAY optimization for grayscale masks (50% size reduction)
+ *
  * @param {Int16Array|Array} arrayA - First array of signed 16-bit integers
  * @param {Int16Array|Array} arrayB - Second array of signed 16-bit integers
  * @param {number} width - Image width (optional, 0 if unknown)
  * @param {number} height - Image height (optional, 0 if unknown)
- * @returns {Buffer} SAC v1 binary data
+ * @returns {Buffer} SAC v1.1 binary data
  */
 function buildSAC(arrayA, arrayB, width = 0, height = 0) {
   // Ensure we have typed arrays
@@ -31,6 +36,26 @@ function buildSAC(arrayA, arrayB, width = 0, height = 0) {
     }
   }
 
+  // Check if arrays are identical (SAC v1.1 single-array optimization)
+  let flags = 0;
+  let arraysCount = ARRAYS_COUNT;
+  let isSingleArray = false;
+
+  if (lengthA === lengthB) {
+    isSingleArray = true;
+    for (let i = 0; i < lengthA; i++) {
+      if (a[i] !== b[i]) {
+        isSingleArray = false;
+        break;
+      }
+    }
+  }
+
+  if (isSingleArray) {
+    flags |= FLAG_SINGLE_ARRAY;
+    arraysCount = 1;
+  }
+
   // Create header buffer (24 bytes)
   const header = Buffer.allocUnsafe(HEADER_SIZE);
   let offset = 0;
@@ -39,16 +64,16 @@ function buildSAC(arrayA, arrayB, width = 0, height = 0) {
   SAC_MAGIC.copy(header, offset);
   offset += 4;
 
-  // flags: 1 byte (0)
-  header.writeUInt8(0, offset);
+  // flags: 1 byte
+  header.writeUInt8(flags, offset);
   offset += 1;
 
   // dtype_code: 1 byte (1 = int16)
   header.writeUInt8(DTYPE_INT16, offset);
   offset += 1;
 
-  // arrays_count: 1 byte (2)
-  header.writeUInt8(ARRAYS_COUNT, offset);
+  // arrays_count: 1 byte (1 or 2)
+  header.writeUInt8(arraysCount, offset);
   offset += 1;
 
   // reserved: 1 byte (0)
@@ -72,10 +97,14 @@ function buildSAC(arrayA, arrayB, width = 0, height = 0) {
 
   // Create payload buffers
   const payloadA = Buffer.from(a.buffer, a.byteOffset, a.byteLength);
-  const payloadB = Buffer.from(b.buffer, b.byteOffset, b.byteLength);
 
-  // Concatenate header + payloadA + payloadB
-  return Buffer.concat([header, payloadA, payloadB]);
+  // SAC v1.1: Omit payloadB if single array flag is set (50% size reduction)
+  if (isSingleArray) {
+    return Buffer.concat([header, payloadA]);
+  } else {
+    const payloadB = Buffer.from(b.buffer, b.byteOffset, b.byteLength);
+    return Buffer.concat([header, payloadA, payloadB]);
+  }
 }
 
 /**
@@ -129,10 +158,11 @@ async function pngToSAC(pngBuffer) {
 }
 
 /**
- * Parses SAC v1 binary data and extracts the arrays
+ * Parses SAC v1.1 binary data and extracts the arrays
+ * Supports FLAG_SINGLE_ARRAY optimization for grayscale masks
  * Useful for validation and testing
  *
- * @param {Buffer} sacBuffer - SAC v1 binary data
+ * @param {Buffer} sacBuffer - SAC v1.1 binary data
  * @returns {Object} Parsed SAC data with arrays and metadata
  */
 function parseSAC(sacBuffer) {
@@ -161,7 +191,7 @@ function parseSAC(sacBuffer) {
 
   const arraysCount = sacBuffer.readUInt8(offset);
   offset += 1;
-  if (arraysCount !== ARRAYS_COUNT) {
+  if (arraysCount !== 1 && arraysCount !== ARRAYS_COUNT) {
     throw new Error(`Unsupported arrays_count: ${arraysCount}`);
   }
 
@@ -180,8 +210,19 @@ function parseSAC(sacBuffer) {
   const height = sacBuffer.readUInt32LE(offset);
   offset += 4;
 
+  // Check if single array mode is enabled
+  const isSingleArray = (flags & FLAG_SINGLE_ARRAY) !== 0;
+
   // Validate buffer size
-  const expectedSize = HEADER_SIZE + (lengthA * 2) + (lengthB * 2);
+  let expectedSize;
+  if (isSingleArray) {
+    // SAC v1.1: Only arrayA is stored, arrayB is omitted
+    expectedSize = HEADER_SIZE + (lengthA * 2);
+  } else {
+    // SAC v1.0: Both arrays are stored
+    expectedSize = HEADER_SIZE + (lengthA * 2) + (lengthB * 2);
+  }
+
   if (sacBuffer.length !== expectedSize) {
     throw new Error(`Buffer size mismatch: expected ${expectedSize}, got ${sacBuffer.length}`);
   }
@@ -204,11 +245,18 @@ function parseSAC(sacBuffer) {
   );
   offset += lengthA * 2;
 
-  const arrayB = new Int16Array(
-    sacBuffer.buffer,
-    sacBuffer.byteOffset + offset,
-    lengthB
-  );
+  let arrayB;
+  if (isSingleArray) {
+    // SAC v1.1: Duplicate arrayA to create arrayB (grayscale optimization)
+    arrayB = new Int16Array(arrayA);
+  } else {
+    // SAC v1.0: Read arrayB from buffer
+    arrayB = new Int16Array(
+      sacBuffer.buffer,
+      sacBuffer.byteOffset + offset,
+      lengthB
+    );
+  }
 
   return {
     flags,
@@ -220,6 +268,7 @@ function parseSAC(sacBuffer) {
     height,
     arrayA,
     arrayB,
+    isSingleArray,
   };
 }
 
@@ -231,4 +280,5 @@ module.exports = {
   DTYPE_INT16,
   ARRAYS_COUNT,
   HEADER_SIZE,
+  FLAG_SINGLE_ARRAY,
 };

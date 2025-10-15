@@ -119,16 +119,7 @@ const downloadUrlQuerySchema = z.object({
     .optional(),
 });
 
-const maskQuerySchema = z.object({
-  resolution: z
-    .preprocess((value) => {
-      if (typeof value === 'string') {
-        return value.trim().toLowerCase();
-      }
-      return 'hi'; // Default to high resolution
-    }, z.enum(['hi', 'lo']))
-    .optional(),
-});
+const maskQuerySchema = z.object({});
 
 const checkExistsQuerySchema = z.object({
   id: z

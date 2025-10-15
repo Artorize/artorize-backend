@@ -59,8 +59,7 @@ async function uploadArtwork(req, res, next) {
   try {
     const originalFile = pickSingleFile(req.files, 'original');
     const protectedFile = pickSingleFile(req.files, 'protected');
-    const maskHiFile = pickSingleFile(req.files, 'maskHi');
-    const maskLoFile = pickSingleFile(req.files, 'maskLo');
+    const maskFile = pickSingleFile(req.files, 'mask');
     const analysisFile = pickSingleFile(req.files, 'analysis');
     const summaryFile = pickSingleFile(req.files, 'summary');
 
@@ -73,8 +72,7 @@ async function uploadArtwork(req, res, next) {
     const document = await createArtwork({
       originalFile,
       protectedFile,
-      maskHiFile,
-      maskLoFile,
+      maskFile,
       analysisJson: parseJsonFile(analysisFile, 'analysis'),
       summaryJson: parseJsonFile(summaryFile, 'summary'),
       body,
@@ -95,7 +93,7 @@ async function getArtworkStream(req, res, next) {
   const variant = (req.query.variant || 'original').toString();
 
   // Validate variant name format
-  const validVariants = ['original', 'protected', 'mask_hi', 'mask_lo'];
+  const validVariants = ['original', 'protected', 'mask'];
   if (!validVariants.includes(variant)) {
     return res.status(404).json({ error: 'Variant not available' });
   }
@@ -268,7 +266,7 @@ async function downloadArtwork(req, res, next) {
   const variant = (req.query.variant || 'original').toString();
 
   // Validate variant name format
-  const validVariants = ['original', 'protected', 'mask_hi', 'mask_lo'];
+  const validVariants = ['original', 'protected', 'mask'];
   if (!validVariants.includes(variant)) {
     return res.status(404).json({ error: 'Variant not available' });
   }
@@ -331,8 +329,7 @@ async function checkExists(req, res, next) {
 
 async function getMask(req, res, next) {
   const { id } = req.params;
-  const resolution = req.query.resolution || 'hi';
-  const variant = `mask_${resolution}`;
+  const variant = 'mask';
 
   try {
     const doc = await getArtworkById(id);
@@ -342,18 +339,18 @@ async function getMask(req, res, next) {
 
     const format = doc.formats?.[variant];
     if (!format || !format.fileId) {
-      return res.status(404).json({ error: `Mask with resolution '${resolution}' not available` });
+      return res.status(404).json({ error: 'Mask not available' });
     }
 
     const bucket = getMaskBucket();
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     res.setHeader('ETag', `${doc._id}-${variant}`);
     res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', `inline; filename="${doc.title || 'artwork'}-mask-${resolution}.sac"`);
+    res.setHeader('Content-Disposition', `inline; filename="${doc.title || 'artwork'}-mask.sac"`);
 
     const stream = downloadStreamFromBucket(bucket, format.fileId);
     stream.on('error', (err) => {
-      req.log.error({ err, artworkId: id, resolution }, 'Error streaming mask file');
+      req.log.error({ err, artworkId: id }, 'Error streaming mask file');
       if (!res.headersSent) {
         res.status(404).end();
       } else {
@@ -362,7 +359,7 @@ async function getMask(req, res, next) {
     });
     stream.pipe(res);
   } catch (error) {
-    req.log.error({ err: error, artworkId: id, resolution }, 'Failed to stream mask');
+    req.log.error({ err: error, artworkId: id }, 'Failed to stream mask');
     next(error);
   }
 }
