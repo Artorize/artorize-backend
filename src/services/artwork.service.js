@@ -66,16 +66,14 @@ function resolveFilename(originalName, fallback) {
 async function createArtwork({
   originalFile,
   protectedFile,
-  maskHiFile,
-  maskLoFile,
+  maskFile,
   analysisJson,
   summaryJson,
   body = {},
 }) {
   ensureFilePresence(originalFile, 'original image');
   ensureFilePresence(protectedFile, 'protected image');
-  ensureFilePresence(maskHiFile, 'maskHi file');
-  ensureFilePresence(maskLoFile, 'maskLo file');
+  ensureFilePresence(maskFile, 'mask file');
 
   const originalBuffer = Buffer.isBuffer(originalFile.buffer)
     ? originalFile.buffer
@@ -83,44 +81,30 @@ async function createArtwork({
   const protectedBuffer = Buffer.isBuffer(protectedFile.buffer)
     ? protectedFile.buffer
     : Buffer.from(protectedFile.buffer);
-  const maskHiBuffer = Buffer.isBuffer(maskHiFile.buffer)
-    ? maskHiFile.buffer
-    : Buffer.from(maskHiFile.buffer);
-  const maskLoBuffer = Buffer.isBuffer(maskLoFile.buffer)
-    ? maskLoFile.buffer
-    : Buffer.from(maskLoFile.buffer);
+  const maskBuffer = Buffer.isBuffer(maskFile.buffer)
+    ? maskFile.buffer
+    : Buffer.from(maskFile.buffer);
 
-  // Validate SAC v1 format for masks
+  // Validate SAC v1 format for mask
   try {
-    parseSAC(maskHiBuffer);
+    parseSAC(maskBuffer);
   } catch (error) {
-    const err = new Error(`Invalid SAC format for maskHi: ${error.message}`);
-    err.status = 400;
-    throw err;
-  }
-
-  try {
-    parseSAC(maskLoBuffer);
-  } catch (error) {
-    const err = new Error(`Invalid SAC format for maskLo: ${error.message}`);
+    const err = new Error(`Invalid SAC format for mask: ${error.message}`);
     err.status = 400;
     throw err;
   }
 
   const originalFilename = resolveFilename(originalFile.originalname, 'original-image');
   const protectedFilename = resolveFilename(protectedFile.originalname, 'protected-image');
-  const maskHiFilename = resolveFilename(maskHiFile.originalname, 'mask-hi.sac');
-  const maskLoFilename = resolveFilename(maskLoFile.originalname, 'mask-lo.sac');
+  const maskFilename = resolveFilename(maskFile.originalname, 'mask.sac');
 
   const originalMimeType = originalFile.mimetype || 'application/octet-stream';
   const protectedMimeType = protectedFile.mimetype || 'application/octet-stream';
-  const maskHiMimeType = 'application/octet-stream'; // SAC v1 format
-  const maskLoMimeType = 'application/octet-stream'; // SAC v1 format
+  const maskMimeType = 'application/octet-stream'; // SAC v1 format
 
   const originalChecksum = sha256FromBuffer(originalBuffer);
   const protectedChecksum = sha256FromBuffer(protectedBuffer);
-  const maskHiChecksum = sha256FromBuffer(maskHiBuffer);
-  const maskLoChecksum = sha256FromBuffer(maskLoBuffer);
+  const maskChecksum = sha256FromBuffer(maskBuffer);
 
   const baseImage = sharp(originalBuffer, { failOnError: false });
   const metaInfo = await baseImage.metadata();
@@ -144,25 +128,16 @@ async function createArtwork({
       data: protectedBuffer,
       checksum: protectedChecksum,
     },
-    // Masks are stored in SAC v1 binary format
+    // Mask is stored in SAC v1 binary format
     // SAC = Simple Array Container - compact binary protocol for int16 arrays
     {
-      key: 'mask_hi',
+      key: 'mask',
       bucket: getMaskBucket(),
       bucketKey: 'masks',
-      filename: maskHiFilename,
-      contentType: maskHiMimeType,
-      data: maskHiBuffer,
-      checksum: maskHiChecksum,
-    },
-    {
-      key: 'mask_lo',
-      bucket: getMaskBucket(),
-      bucketKey: 'masks',
-      filename: maskLoFilename,
-      contentType: maskLoMimeType,
-      data: maskLoBuffer,
-      checksum: maskLoChecksum,
+      filename: maskFilename,
+      contentType: maskMimeType,
+      data: maskBuffer,
+      checksum: maskChecksum,
     },
   ];
 
