@@ -33,7 +33,7 @@ If you're already on the server:
 ```bash
 # Clone or copy the repository
 cd /opt
-git clone https://github.com/your-org/artorize-backend.git
+git clone https://github.com/Artorize/artorize-backend.git
 cd artorize-backend
 
 # Run deployment script

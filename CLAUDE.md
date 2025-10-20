@@ -14,7 +14,8 @@ npm run seed:inputdata   # Seed database with sample data from config/runtime.js
 ### Production
 ```bash
 npm start                # Start production server
-npm run deploy           # Full deployment pipeline (config, deps, indexes, server)
+npm run deploy           # Local deployment (config, deps, indexes, server)
+npm run deploy:prod      # Production deployment with systemd setup (requires sudo)
 npm run start:prod       # Start with NODE_ENV=production explicitly
 ```
 
@@ -75,7 +76,7 @@ The following indexes are auto-created on startup:
 - `GET /artworks/check-exists` - Check if artwork already exists (supports id, checksum, title+artist, tags)
 - `GET /health` - Comprehensive health check with component diagnostics (MongoDB, GridFS, hash storage, system metrics)
 
-**📖 Complete API Documentation**: See `API.md` for detailed endpoint specifications, examples, and usage patterns.
+**Complete API Documentation**: See `API.md` for detailed endpoint specifications, examples, and usage patterns.
 
 ### File Upload Structure
 When uploading artwork, the multipart form expects:
@@ -94,4 +95,7 @@ When uploading artwork, the multipart form expects:
 3. Run `npm run dev` for development with auto-reload
 4. Use `npm run seed:inputdata` to populate test data if needed
 
-For production deployment, use `npm run deploy` which handles configuration setup, dependency installation, index creation, and server startup.
+## Deployment
+
+- **Local/Development**: `npm run deploy` - Creates config, installs dependencies, sets up indexes, and starts the server
+- **Production**: `sudo npm run deploy:prod` - Full production deployment to `/opt/artorize-storage-backend` with systemd service setup
