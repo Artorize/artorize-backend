@@ -4,6 +4,7 @@ const pinoHttp = require('pino-http');
 const artworksRouter = require('./routes/artworks.routes');
 const similarityRouter = require('./routes/similarity.routes');
 const tokensRouter = require('./routes/tokens.routes');
+const { healthCheck } = require('./controllers/health.controller');
 const { notFound, errorHandler } = require('./middlewares/errorHandler');
 const { generalLimiter } = require('./middlewares/rateLimit');
 const logger = require('./config/logger');
@@ -17,9 +18,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(generalLimiter);
 
-app.get('/health', (req, res) => {
-  res.json({ ok: true, uptime: process.uptime() });
-});
+app.get('/health', healthCheck);
 
 app.use('/tokens', tokensRouter);
 app.use('/artworks', artworksRouter);

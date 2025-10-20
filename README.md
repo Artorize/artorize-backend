@@ -119,7 +119,7 @@ This will:
 
 1. **Create systemd service file:**
    ```bash
-   sudo nano /etc/systemd/system/artorize-storage.service
+   sudo nano /etc/systemd/system/artorize-backend.service
    ```
 
 2. **Add service configuration:**
@@ -140,7 +140,7 @@ This will:
    RestartSec=10
    StandardOutput=syslog
    StandardError=syslog
-   SyslogIdentifier=artorize-storage
+   SyslogIdentifier=artorize-backend
    Environment="NODE_ENV=production"
 
    # Security hardening
@@ -176,22 +176,22 @@ This will:
    sudo systemctl daemon-reload
 
    # Enable service to start on boot
-   sudo systemctl enable artorize-storage.service
+   sudo systemctl enable artorize-backend.service
 
    # Start the service
-   sudo systemctl start artorize-storage.service
+   sudo systemctl start artorize-backend.service
 
    # Check service status
-   sudo systemctl status artorize-storage.service
+   sudo systemctl status artorize-backend.service
    ```
 
 5. **View logs:**
    ```bash
    # View recent logs
-   sudo journalctl -u artorize-storage.service -n 50
+   sudo journalctl -u artorize-backend.service -n 50
 
    # Follow logs in real-time
-   sudo journalctl -u artorize-storage.service -f
+   sudo journalctl -u artorize-backend.service -f
    ```
 
 ### Nginx Reverse Proxy (Optional)
@@ -250,7 +250,7 @@ set -euo pipefail
 
 REPO_URL="https://github.com/Artorize/artorize-backend.git"
 DEPLOY_DIR="/opt/artorize-storage-backend"
-SERVICE_NAME="artorize-storage"
+SERVICE_NAME="artorize-backend"
 
 echo "Starting deployment..."
 
@@ -391,10 +391,10 @@ The seeder skips re-imports by checksum and populates the `artworks_meta` collec
 curl http://localhost:3000/health
 
 # Monitor with systemd
-sudo systemctl status artorize-storage
+sudo systemctl status artorize-backend
 
 # View error logs
-sudo journalctl -u artorize-storage -p err -n 50
+sudo journalctl -u artorize-backend -p err -n 50
 ```
 
 ### Database Maintenance

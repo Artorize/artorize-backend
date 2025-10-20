@@ -160,12 +160,107 @@ Get token statistics (monitoring).
 ---
 
 ### `GET /health`
-Service health status.
+Comprehensive service health status with component-level diagnostics.
 
-**Response**: `200 OK`
+**Response**: `200 OK` (healthy/degraded) or `503 Service Unavailable` (unhealthy)
+
+**Healthy Response Example**:
 ```json
-{ "ok": true, "uptime": 12345.67 }
+{
+  "status": "healthy",
+  "timestamp": "2025-10-20T10:30:45.123Z",
+  "uptime": 86400.5,
+  "responseTime": 45,
+  "components": {
+    "mongodb": {
+      "status": "healthy",
+      "connected": true,
+      "database": "artgallery",
+      "version": "7.0.0",
+      "uptime": 86400
+    },
+    "gridfs": {
+      "status": "healthy",
+      "bucketsFound": 6,
+      "bucketsExpected": 6,
+      "buckets": {
+        "originals": true,
+        "protected": true,
+        "masks": true
+      }
+    },
+    "hashStorage": {
+      "status": "healthy",
+      "artworksCount": 1234,
+      "indexesConfigured": true
+    }
+  },
+  "system": {
+    "nodeVersion": "v18.17.0",
+    "platform": "linux",
+    "memory": {
+      "heapUsed": 85,
+      "heapTotal": 120,
+      "rss": 150
+    }
+  }
+}
 ```
+
+**Degraded Response Example** (partial service availability):
+```json
+{
+  "status": "degraded",
+  "timestamp": "2025-10-20T10:30:45.123Z",
+  "uptime": 86400.5,
+  "responseTime": 52,
+  "components": {
+    "mongodb": {
+      "status": "healthy",
+      "connected": true,
+      "database": "artgallery",
+      "version": "7.0.0",
+      "uptime": 86400
+    },
+    "gridfs": {
+      "status": "degraded",
+      "bucketsFound": 4,
+      "bucketsExpected": 6,
+      "buckets": {
+        "originals": true,
+        "protected": true,
+        "masks": false
+      }
+    },
+    "hashStorage": {
+      "status": "healthy",
+      "artworksCount": 1234,
+      "indexesConfigured": true
+    }
+  },
+  "system": {
+    "nodeVersion": "v18.17.0",
+    "platform": "linux",
+    "memory": {
+      "heapUsed": 85,
+      "heapTotal": 120,
+      "rss": 150
+    }
+  }
+}
+```
+
+**Component Status Values**:
+- `healthy`: Component fully operational
+- `degraded`: Component partially operational (some features may not work)
+- `unhealthy`: Component not operational
+- `unknown`: Unable to determine component status
+
+**Notes**:
+- Health endpoint is **exempt from rate limiting** for monitoring purposes
+- Returns HTTP 503 when overall status is `unhealthy`
+- Memory values are in MB
+- `responseTime` is in milliseconds
 
 ---
 
