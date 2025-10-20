@@ -242,7 +242,7 @@ log_info "Creating systemd service..."
 cat > /etc/systemd/system/artorize-backend.service <<EOF
 [Unit]
 Description=Artorize Backend Service
-Documentation=https://github.com/artorize/artorize-backend
+Documentation=https://github.com/Artorize/artorize-backend
 After=network.target mongodb.service
 Wants=mongodb.service
 

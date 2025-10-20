@@ -59,233 +59,106 @@ Settings are loaded from `config/runtime.json`. The deployment helper will mater
 | `mongo.dbName` | Database used to store metadata & GridFS buckets. | `artgallery` |
 | `logLevel` | pino logging level (`debug`, `info`, etc.). | `info` |
 
-## Production Deployment (Debian/Ubuntu)
+## Deployment
 
-### Prerequisites
-- Node.js 18+ and npm installed
-- MongoDB installed and running (assumed at `mongodb://localhost:27017`)
-- Git installed for cloning repository
-
-### One-Line Installation
-
-For a fully automated setup on Debian/Ubuntu servers with MongoDB already installed:
+### Local Development (Quick Start)
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/Artorize/artorize-backend/main/scripts/quick-install.sh | sudo bash
-```
-
-Or use the auto-deployment script directly:
-
-```bash
-wget https://raw.githubusercontent.com/Artorize/artorize-backend/main/scripts/auto-deploy.sh
-chmod +x auto-deploy.sh
-sudo ./auto-deploy.sh
+npm run deploy
 ```
 
 This will:
-- Clone the repository to `/opt/artorize-storage-backend`
+- Create default `config/runtime.json` if missing
+- Install dependencies
+- Create MongoDB indexes
+- Start the server
+
+### Production Deployment
+
+#### Option 1: Debian 12 Automated Deployment (Recommended)
+
+For a complete Debian 12 server setup with all dependencies:
+
+```bash
+# Clone the repository
+git clone https://github.com/Artorize/artorize-backend.git
+cd artorize-backend
+
+# Run the automated deployment script
+sudo ./deploy-debian12.sh --production --domain your-domain.com
+```
+
+This script will:
+- Install Node.js 20, MongoDB 7.0, and system dependencies
+- Create dedicated application user
+- Deploy to `/opt/artorize-backend`
+- Setup systemd service with security hardening
+- Configure Nginx reverse proxy with proper headers
+- Setup firewall rules
+- Start all services automatically
+
+For more details, see `DEPLOY.md`.
+
+**Common deployment options:**
+
+```bash
+# Production with custom port
+sudo ./deploy-debian12.sh --production --port 3000
+
+# Skip Nginx (use application port directly)
+sudo ./deploy-debian12.sh --production --skip-nginx
+
+# Update existing deployment (skip system deps)
+sudo ./deploy-debian12.sh --production --skip-system-deps --skip-mongodb
+```
+
+#### Option 2: Generic Linux Deployment
+
+For other Linux distributions or existing setups with dependencies already installed:
+
+**Prerequisites:** Node.js 18+, MongoDB, and Git installed
+
+```bash
+# Clone and deploy
+git clone https://github.com/Artorize/artorize-backend.git
+cd artorize-backend
+sudo npm run deploy:prod
+```
+
+This will:
+- Deploy application to `/opt/artorize-storage-backend`
 - Install dependencies and configure the application
 - Setup systemd service for automatic startup
 - Create MongoDB indexes
-- Optionally configure Nginx reverse proxy
 - Start the service immediately
+- Create backups of existing deployments
 
-### Manual Quick Deployment
-
-1. **Clone and setup the application:**
-   ```bash
-   # Clone repository
-   git clone https://github.com/Artorize/artorize-backend.git
-   cd artorize-storage-backend
-
-   # Run deployment script (creates config, installs deps, sets indexes, starts server)
-   npm run deploy
-   ```
-
-2. **Configure MongoDB (if not using default localhost):**
-   ```bash
-   # Edit the generated config file
-   nano config/runtime.json
-   # Update mongo.uri and mongo.dbName as needed
-   ```
-
-3. **Restart the application:**
-   ```bash
-   # Stop current process (Ctrl+C) and restart
-   npm run deploy
-   ```
-
-### Automatic Deployment with systemd
-
-1. **Create systemd service file:**
-   ```bash
-   sudo nano /etc/systemd/system/artorize-backend.service
-   ```
-
-2. **Add service configuration:**
-   ```ini
-   [Unit]
-   Description=Artorize Storage Backend
-   Documentation=https://github.com/your-org/artorize-storage-backend
-   After=network.target mongodb.service
-   Wants=mongodb.service
-
-   [Service]
-   Type=simple
-   User=www-data
-   Group=www-data
-   WorkingDirectory=/opt/artorize-storage-backend
-   ExecStart=/usr/bin/node /opt/artorize-storage-backend/src/server.js --config=/opt/artorize-storage-backend/config/runtime.json
-   Restart=always
-   RestartSec=10
-   StandardOutput=syslog
-   StandardError=syslog
-   SyslogIdentifier=artorize-backend
-   Environment="NODE_ENV=production"
-
-   # Security hardening
-   NoNewPrivileges=true
-   PrivateTmp=true
-   ProtectSystem=strict
-   ProtectHome=true
-   ReadWritePaths=/opt/artorize-storage-backend/config
-
-   [Install]
-   WantedBy=multi-user.target
-   ```
-
-3. **Setup application directory:**
-   ```bash
-   # Move application to /opt
-   sudo mv artorize-storage-backend /opt/
-   cd /opt/artorize-storage-backend
-
-   # Set proper permissions
-   sudo chown -R www-data:www-data /opt/artorize-storage-backend
-
-   # Install dependencies as www-data
-   sudo -u www-data npm ci --production
-
-   # Ensure indexes are created
-   sudo -u www-data node scripts/ensure-indexes.js --config=config/runtime.json
-   ```
-
-4. **Enable and start the service:**
-   ```bash
-   # Reload systemd daemon
-   sudo systemctl daemon-reload
-
-   # Enable service to start on boot
-   sudo systemctl enable artorize-backend.service
-
-   # Start the service
-   sudo systemctl start artorize-backend.service
-
-   # Check service status
-   sudo systemctl status artorize-backend.service
-   ```
-
-5. **View logs:**
-   ```bash
-   # View recent logs
-   sudo journalctl -u artorize-backend.service -n 50
-
-   # Follow logs in real-time
-   sudo journalctl -u artorize-backend.service -f
-   ```
-
-### Nginx Reverse Proxy (Optional)
-
-1. **Install Nginx:**
-   ```bash
-   sudo apt update
-   sudo apt install nginx
-   ```
-
-2. **Configure Nginx:**
-   ```bash
-   sudo nano /etc/nginx/sites-available/artorize-storage
-   ```
-
-3. **Add proxy configuration:**
-   ```nginx
-   server {
-       listen 80;
-       server_name your-domain.com;
-
-       client_max_body_size 256M;  # Match file upload limit
-
-       location / {
-           proxy_pass http://127.0.0.1:3000;
-           proxy_http_version 1.1;
-           proxy_set_header Upgrade $http_upgrade;
-           proxy_set_header Connection 'upgrade';
-           proxy_set_header Host $host;
-           proxy_set_header X-Real-IP $remote_addr;
-           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-           proxy_set_header X-Forwarded-Proto $scheme;
-           proxy_cache_bypass $http_upgrade;
-
-           # Timeout settings for large file uploads
-           proxy_connect_timeout 300;
-           proxy_send_timeout 300;
-           proxy_read_timeout 300;
-       }
-   }
-   ```
-
-4. **Enable site and restart Nginx:**
-   ```bash
-   sudo ln -s /etc/nginx/sites-available/artorize-storage /etc/nginx/sites-enabled/
-   sudo nginx -t
-   sudo systemctl restart nginx
-   ```
-
-### Automated Deployment Script
-
-**Create deployment script** (`/opt/deploy-artorize.sh`):
+**Configure MongoDB (if not using default localhost):**
 ```bash
-#!/bin/bash
-set -euo pipefail
-
-REPO_URL="https://github.com/Artorize/artorize-backend.git"
-DEPLOY_DIR="/opt/artorize-storage-backend"
-SERVICE_NAME="artorize-backend"
-
-echo "Starting deployment..."
-
-# Stop service
-sudo systemctl stop $SERVICE_NAME || true
-
-# Backup current deployment
-if [ -d "$DEPLOY_DIR" ]; then
-    sudo mv $DEPLOY_DIR ${DEPLOY_DIR}.backup.$(date +%Y%m%d%H%M%S)
-fi
-
-# Clone repository
-sudo git clone $REPO_URL $DEPLOY_DIR
-cd $DEPLOY_DIR
-
-# Copy previous config if exists
-if [ -f "${DEPLOY_DIR}.backup.*/config/runtime.json" ]; then
-    sudo cp ${DEPLOY_DIR}.backup.*/config/runtime.json config/
-fi
-
-# Set permissions
-sudo chown -R www-data:www-data $DEPLOY_DIR
-
-# Install dependencies and setup
-sudo -u www-data npm ci --production
-sudo -u www-data node scripts/ensure-indexes.js --config=config/runtime.json
-
-# Start service
-sudo systemctl start $SERVICE_NAME
-sudo systemctl status $SERVICE_NAME
-
-echo "Deployment completed!"
+sudo nano /opt/artorize-storage-backend/config/runtime.json
+# Update mongo.uri and mongo.dbName as needed
 ```
 
-Make executable: `sudo chmod +x /opt/deploy-artorize.sh`
+**Restart service:**
+```bash
+sudo systemctl restart artorize-backend
+```
+
+### Service Management
+
+```bash
+# Check service status
+sudo systemctl status artorize-backend
+
+# View logs
+sudo journalctl -u artorize-backend -f
+
+# Restart service
+sudo systemctl restart artorize-backend
+
+# Stop service
+sudo systemctl stop artorize-backend
+```
 
 ### CI/CD Integration
 
@@ -298,9 +171,9 @@ SKIP_INSTALL=1 npm run deploy
 SKIP_INSTALL=1 SKIP_SERVER_START=1 npm run deploy
 ```
 
-### Manual Server Control
+### Custom Configuration
 
-Run with custom configuration:
+Run with custom configuration path:
 ```bash
 node src/server.js --config=/path/to/custom-runtime.json
 ```
@@ -448,14 +321,14 @@ npx mocha tests/artworks.test.js
 ### Test Coverage
 
 The test suite covers:
-- ✅ File upload with validation
-- ✅ All read endpoints (stream, metadata, variants, download)
-- ✅ Batch operations
-- ✅ Search functionality
-- ✅ Error handling and edge cases
-- ✅ Data integrity (checksums)
-- ✅ Concurrent operations
-- ✅ Performance benchmarks
+- File upload with validation
+- All read endpoints (stream, metadata, variants, download)
+- Batch operations
+- Search functionality
+- Error handling and edge cases
+- Data integrity (checksums)
+- Concurrent operations
+- Performance benchmarks
 
 ## Development Tips
 
