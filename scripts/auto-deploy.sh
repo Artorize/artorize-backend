@@ -7,7 +7,7 @@ set -euo pipefail
 # Configuration
 REPO_URL="${REPO_URL:-https://github.com/Artorize/artorize-backend.git}"
 DEPLOY_DIR="/opt/artorize-storage-backend"
-SERVICE_NAME="artorize-storage"
+SERVICE_NAME="artorize-backend"
 SERVICE_USER="www-data"
 SERVICE_GROUP="www-data"
 BACKUP_DIR="/var/backups/artorize"
@@ -154,7 +154,7 @@ setup_service() {
     log_info "Setting up systemd service..."
 
     # Copy service file
-    cp "$DEPLOY_DIR/scripts/artorize-storage.service" "/etc/systemd/system/$SERVICE_NAME.service"
+    cp "$DEPLOY_DIR/scripts/artorize-backend.service" "/etc/systemd/system/$SERVICE_NAME.service"
 
     # Reload systemd
     systemctl daemon-reload

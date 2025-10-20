@@ -73,7 +73,7 @@ The following indexes are auto-created on startup:
 - `GET /artworks/:id/metadata` - Get artwork metadata
 - `GET /artworks` - Search artworks (supports artist, tags, text queries)
 - `GET /artworks/check-exists` - Check if artwork already exists (supports id, checksum, title+artist, tags)
-- `GET /health` - Health check endpoint
+- `GET /health` - Comprehensive health check with component diagnostics (MongoDB, GridFS, hash storage, system metrics)
 
 **📖 Complete API Documentation**: See `API.md` for detailed endpoint specifications, examples, and usage patterns.
 

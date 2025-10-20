@@ -14,7 +14,7 @@ Restart=always
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=artorize-storage
+SyslogIdentifier=artorize-backend
 Environment="NODE_ENV=production"
 
 # Performance tuning
