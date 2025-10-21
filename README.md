@@ -61,88 +61,75 @@ Settings are loaded from `config/runtime.json`. The deployment helper will mater
 
 ## Deployment
 
-### Local Development (Quick Start)
+### One-Line Deployment (Recommended)
+
+Deploy to a fresh Debian 12 server with a single command:
 
 ```bash
-npm run deploy
+curl -sSL https://raw.githubusercontent.com/Artorize/artorize-backend/main/deploy.sh | sudo bash -s -- --production
 ```
 
-This will:
-- Create default `config/runtime.json` if missing
-- Install dependencies
-- Create MongoDB indexes
-- Start the server
+**With domain (for SSL setup):**
+```bash
+curl -sSL https://raw.githubusercontent.com/Artorize/artorize-backend/main/deploy.sh | sudo bash -s -- --production --domain your-domain.com
+```
 
-### Production Deployment
+**What it does:**
+- Installs Node.js 20, MongoDB 7.0, and system dependencies
+- Clones repository to `/opt/artorize-backend`
+- Creates dedicated application user
+- Sets up systemd service with security hardening
+- Configures Nginx reverse proxy with proper headers
+- Sets up firewall rules
+- Automatically starts all services
+- Creates backups of existing installations
 
-#### Option 1: Debian 12 Automated Deployment (Recommended)
+**Note:** Domain is optional. It's only needed for SSL certificates or specific hostname routing. Without it, the application will be accessible via IP address or any hostname pointing to your server.
 
-For a complete Debian 12 server setup with all dependencies:
+### Manual Deployment
+
+If you prefer to clone first or customize the deployment:
 
 ```bash
-# Clone the repository
 git clone https://github.com/Artorize/artorize-backend.git
 cd artorize-backend
-
-# Run the automated deployment script
-sudo ./deploy-debian12.sh --production --domain your-domain.com
+sudo ./deploy.sh --production
 ```
 
-This script will:
-- Install Node.js 20, MongoDB 7.0, and system dependencies
-- Create dedicated application user
-- Deploy to `/opt/artorize-backend`
-- Setup systemd service with security hardening
-- Configure Nginx reverse proxy with proper headers
-- Setup firewall rules
-- Start all services automatically
-
-For more details, see `DEPLOY.md`.
-
-**Common deployment options:**
+**Deployment options:**
 
 ```bash
-# Production with custom port
-sudo ./deploy-debian12.sh --production --port 3000
+# Custom port
+sudo ./deploy.sh --production --port 3000
 
 # Skip Nginx (use application port directly)
-sudo ./deploy-debian12.sh --production --skip-nginx
+sudo ./deploy.sh --production --skip-nginx
 
-# Update existing deployment (skip system deps)
-sudo ./deploy-debian12.sh --production --skip-system-deps --skip-mongodb
+# Update existing deployment (skip system dependencies)
+sudo ./deploy.sh --production --skip-system-deps --skip-mongodb
+
+# Custom repository or branch
+REPO_URL=https://github.com/your-fork/artorize-backend.git REPO_BRANCH=develop sudo ./deploy.sh --production
 ```
 
-#### Option 2: Generic Linux Deployment
+For complete deployment documentation, see `DEPLOY.md`.
 
-For other Linux distributions or existing setups with dependencies already installed:
+### Local Development
 
-**Prerequisites:** Node.js 18+, MongoDB, and Git installed
+For local development without full system setup:
 
 ```bash
-# Clone and deploy
-git clone https://github.com/Artorize/artorize-backend.git
-cd artorize-backend
-sudo npm run deploy:prod
+# Install dependencies
+npm install
+
+# Start in-memory MongoDB (optional)
+npm run mongo:memory
+
+# Start development server with auto-reload
+npm run dev
 ```
 
-This will:
-- Deploy application to `/opt/artorize-storage-backend`
-- Install dependencies and configure the application
-- Setup systemd service for automatic startup
-- Create MongoDB indexes
-- Start the service immediately
-- Create backups of existing deployments
-
-**Configure MongoDB (if not using default localhost):**
-```bash
-sudo nano /opt/artorize-storage-backend/config/runtime.json
-# Update mongo.uri and mongo.dbName as needed
-```
-
-**Restart service:**
-```bash
-sudo systemctl restart artorize-backend
-```
+Configuration will be loaded from `config/runtime.json`. Create it manually or let the deployment script generate a default one.
 
 ### Service Management
 

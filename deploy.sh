@@ -35,6 +35,8 @@ APP_PORT="${APP_PORT:-5001}"
 MONGODB_VERSION="${MONGODB_VERSION:-7.0}"
 NODE_VERSION="${NODE_VERSION:-20}"
 DOMAIN="${DOMAIN:-}"  # Optional: for nginx setup
+REPO_URL="${REPO_URL:-https://github.com/Artorize/artorize-backend.git}"
+REPO_BRANCH="${REPO_BRANCH:-main}"
 
 # Parse command line arguments
 SKIP_SYSTEM_DEPS=false
@@ -185,21 +187,38 @@ else
     log_success "User $APP_USER already exists"
 fi
 
-# Step 6: Set up application directory
-log_info "Setting up application directory..."
-mkdir -p "$APP_DIR"
+# Step 6: Clone repository
+log_info "Cloning repository from $REPO_URL (branch: $REPO_BRANCH)..."
 
-# If running from a local directory with the code, copy it
-if [ -f "package.json" ]; then
-    log_info "Copying application files from current directory..."
-    rsync -av --exclude='node_modules' --exclude='.git' --exclude='*.log' ./ "$APP_DIR/"
-else
-    log_warning "No package.json found in current directory. Please manually copy your application files to $APP_DIR"
+# Backup existing installation if it exists
+if [ -d "$APP_DIR" ]; then
+    BACKUP_DIR="/var/backups/artorize"
+    mkdir -p "$BACKUP_DIR"
+    BACKUP_NAME="artorize-backup-$(date +%Y%m%d-%H%M%S).tar.gz"
+    log_info "Backing up existing installation to $BACKUP_DIR/$BACKUP_NAME..."
+    tar -czf "$BACKUP_DIR/$BACKUP_NAME" -C "$(dirname $APP_DIR)" "$(basename $APP_DIR)" 2>/dev/null || true
+
+    # Save config for restore
+    if [ -f "$APP_DIR/config/runtime.json" ]; then
+        cp "$APP_DIR/config/runtime.json" "$BACKUP_DIR/runtime.json.backup"
+    fi
+
+    # Remove old installation
+    rm -rf "$APP_DIR"
+fi
+
+# Clone repository
+git clone --branch "$REPO_BRANCH" "$REPO_URL" "$APP_DIR"
+
+# Restore config if backup exists
+if [ -f "/var/backups/artorize/runtime.json.backup" ]; then
+    log_info "Restoring configuration from backup..."
+    cp "/var/backups/artorize/runtime.json.backup" "$APP_DIR/config/runtime.json"
 fi
 
 # Set ownership
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
-log_success "Application directory configured"
+log_success "Repository cloned and configured"
 
 # Step 7: Install Node.js dependencies
 log_info "Installing Node.js dependencies..."
