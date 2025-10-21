@@ -56,7 +56,7 @@ Settings are loaded from `config/runtime.json`. The deployment helper will mater
 | `environment` | Runtime environment label mirrored into `NODE_ENV`. | `production` |
 | `port` | HTTP port for the Express server. | `3000` |
 | `mongo.uri` | Mongo connection string (replica set or Atlas). | `mongodb://localhost:27017` |
-| `mongo.dbName` | Database used to store metadata & GridFS buckets. | `artgallery` |
+| `mongo.dbName` | Database used to store metadata & GridFS buckets. | `artorize` |
 | `logLevel` | pino logging level (`debug`, `info`, etc.). | `info` |
 
 ## Deployment
@@ -263,13 +263,13 @@ sudo journalctl -u artorize-backend -p err -n 50
 node scripts/ensure-indexes.js --config=config/runtime.json
 
 # Connect to MongoDB for maintenance
-mongo artgallery
+mongosh artorize
 ```
 
 ### Backup Strategy
 ```bash
 # Backup MongoDB database
-mongodump --db artgallery --out /backup/artgallery-$(date +%Y%m%d)
+mongodump --db artorize --out /backup/artorize-$(date +%Y%m%d)
 
 # Backup configuration
 cp -r /opt/artorize-storage-backend/config /backup/config-$(date +%Y%m%d)
