@@ -82,7 +82,7 @@ curl -sSL https://raw.githubusercontent.com/Artorize/artorize-backend/main/deplo
 - Configures Nginx reverse proxy with proper headers
 - Sets up firewall rules
 - Automatically starts all services
-- Creates backups of existing installations
+- Preserves existing configuration during updates
 
 **Note:** Domain is optional. It's only needed for SSL certificates or specific hostname routing. Without it, the application will be accessible via IP address or any hostname pointing to your server.
 

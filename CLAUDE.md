@@ -109,7 +109,7 @@ The deployment script:
 - Sets up systemd service with security hardening
 - Configures Nginx reverse proxy (optional with `--domain`)
 - Creates MongoDB indexes
-- Backs up existing installations before updating
+- Preserves existing configuration during updates
 
 **Environment variables**:
 - `REPO_URL`: Override repository URL (default: https://github.com/Artorize/artorize-backend.git)
