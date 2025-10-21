@@ -14,8 +14,7 @@ npm run seed:inputdata   # Seed database with sample data from config/runtime.js
 ### Production
 ```bash
 npm start                # Start production server
-npm run deploy           # Local deployment (config, deps, indexes, server)
-npm run deploy:prod      # Production deployment with systemd setup (requires sudo)
+npm run deploy           # Production deployment (Debian 12, requires sudo)
 npm run start:prod       # Start with NODE_ENV=production explicitly
 ```
 
@@ -97,5 +96,32 @@ When uploading artwork, the multipart form expects:
 
 ## Deployment
 
-- **Local/Development**: `npm run deploy` - Creates config, installs dependencies, sets up indexes, and starts the server
-- **Production**: `sudo npm run deploy:prod` - Full production deployment to `/opt/artorize-storage-backend` with systemd service setup
+The application uses a single deployment script (`deploy.sh`) that handles complete server setup:
+
+- **One-line deployment**: `curl -sSL https://raw.githubusercontent.com/Artorize/artorize-backend/main/deploy.sh | sudo bash -s -- --production`
+- **Manual deployment**: `sudo ./deploy.sh --production` (clones from GitHub to `/opt/artorize-backend`)
+- **Via npm**: `sudo npm run deploy` (runs deploy.sh)
+
+The deployment script:
+- Installs Node.js 20, MongoDB 7.0, and system dependencies (Debian 12)
+- Clones repository from GitHub to `/opt/artorize-backend`
+- Creates dedicated application user
+- Sets up systemd service with security hardening
+- Configures Nginx reverse proxy (optional with `--domain`)
+- Creates MongoDB indexes
+- Backs up existing installations before updating
+
+**Environment variables**:
+- `REPO_URL`: Override repository URL (default: https://github.com/Artorize/artorize-backend.git)
+- `REPO_BRANCH`: Override branch (default: main)
+- `APP_DIR`: Override installation directory (default: /opt/artorize-backend)
+- `APP_PORT`: Override application port (default: 5001)
+
+**Common options**:
+- `--production`: Enable production mode
+- `--skip-system-deps`: Skip system package installation
+- `--skip-mongodb`: Skip MongoDB installation
+- `--skip-nginx`: Skip Nginx setup
+- `--domain your-domain.com`: Configure Nginx for specific domain (optional, for SSL setup)
+- `--port PORT`: Set custom application port
+- `--app-dir DIR`: Set custom installation directory

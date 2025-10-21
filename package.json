@@ -11,8 +11,7 @@
     "test:coverage": "nyc --reporter=html --reporter=text mocha tests/**/*.test.js --timeout 10000 --exit",
     "test:fixtures": "node tests/fixtures/generate-fixtures.js",
     "mongo:memory": "node scripts/dev-memory-mongo.js",
-    "deploy": "node scripts/run-deploy.js",
-    "deploy:prod": "bash scripts/deploy.sh --production",
+    "deploy": "bash deploy.sh --production",
     "seed:inputdata": "node scripts/seed-inputdata.js --config=config/runtime.json",
     "start:prod": "cross-env NODE_ENV=production node src/server.js"
   },

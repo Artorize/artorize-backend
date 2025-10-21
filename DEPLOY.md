@@ -10,43 +10,41 @@ This guide covers deploying the Artorize Backend to a Debian 12 server using the
 
 ## Quick Start
 
-### Option 1: Remote Deployment (Recommended)
+### One-Line Deployment (Recommended)
 
-Deploy from your local machine to a remote server:
+Run directly on your server:
 
 ```bash
-# Copy the repository to the server
-rsync -avz --exclude='node_modules' --exclude='.git' \
-  ./ root@your-server-ip:/tmp/artorize-backend/
-
-# SSH into the server and run deployment
-ssh root@your-server-ip
-cd /tmp/artorize-backend
-chmod +x deploy-debian12.sh
-./deploy-debian12.sh --production --domain your-domain.com
+curl -sSL https://raw.githubusercontent.com/Artorize/artorize-backend/main/deploy.sh | sudo bash -s -- --production
 ```
 
-### Option 2: Direct Server Deployment
+With domain for SSL:
+```bash
+curl -sSL https://raw.githubusercontent.com/Artorize/artorize-backend/main/deploy.sh | sudo bash -s -- --production --domain your-domain.com
+```
 
-If you're already on the server:
+The script will automatically clone the repository to `/opt/artorize-backend` and set up all services.
+
+### Manual Deployment
+
+If you prefer to clone first:
 
 ```bash
-# Clone or copy the repository
-cd /opt
+# Clone the repository
 git clone https://github.com/Artorize/artorize-backend.git
 cd artorize-backend
 
 # Run deployment script
-chmod +x deploy-debian12.sh
-sudo ./deploy-debian12.sh --production
+chmod +x deploy.sh
+sudo ./deploy.sh --production
 ```
 
 ## Deployment Script Options
 
-The `deploy-debian12.sh` script supports several options:
+The `deploy.sh` script supports several options:
 
 ```bash
-./deploy-debian12.sh [options]
+./deploy.sh [options]
 
 Options:
   --skip-system-deps    Skip system dependencies installation
@@ -63,22 +61,22 @@ Options:
 
 **Full production deployment with domain:**
 ```bash
-sudo ./deploy-debian12.sh --production --domain api.artorize.com
+sudo ./deploy.sh --production --domain api.artorize.com
 ```
 
 **Development deployment without Nginx:**
 ```bash
-sudo ./deploy-debian12.sh --skip-nginx
+sudo ./deploy.sh --skip-nginx
 ```
 
 **Custom application directory:**
 ```bash
-sudo ./deploy-debian12.sh --production --app-dir /var/www/artorize --port 3000
+sudo ./deploy.sh --production --app-dir /var/www/artorize --port 3000
 ```
 
 **Update existing deployment (skip system deps):**
 ```bash
-sudo ./deploy-debian12.sh --production --skip-system-deps --skip-mongodb
+sudo ./deploy.sh --production --skip-system-deps --skip-mongodb
 ```
 
 ## What the Script Does
@@ -87,15 +85,17 @@ The automated deployment script performs the following steps:
 
 1. **System Update**: Updates all system packages
 2. **Node.js Installation**: Installs Node.js 20.x from NodeSource
-3. **System Dependencies**: Installs build tools and required libraries
+3. **System Dependencies**: Installs build tools and required libraries (git, build-essential, etc.)
 4. **MongoDB Installation**: Installs and configures MongoDB 7.0
 5. **User Creation**: Creates a dedicated `artorize` system user
-6. **Application Setup**: Copies files and installs npm dependencies
-7. **Configuration**: Creates runtime configuration file
-8. **Systemd Service**: Sets up automatic startup and process management
-9. **Nginx Setup**: Configures reverse proxy with proper headers
-10. **Firewall**: Configures UFW to allow HTTP/HTTPS traffic
-11. **Service Start**: Starts and enables the application
+6. **Repository Clone**: Clones the GitHub repository to `/opt/artorize-backend`
+7. **Backup**: Backs up existing installations before updating
+8. **Application Setup**: Installs npm dependencies as the application user
+9. **Configuration**: Creates or restores runtime configuration file
+10. **Systemd Service**: Sets up automatic startup and process management with security hardening
+11. **Nginx Setup**: Configures reverse proxy with proper headers (optional)
+12. **Firewall**: Configures UFW to allow HTTP/HTTPS traffic
+13. **Service Start**: Starts and enables the application
 
 ## Post-Deployment Steps
 
