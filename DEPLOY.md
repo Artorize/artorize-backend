@@ -88,14 +88,13 @@ The automated deployment script performs the following steps:
 3. **System Dependencies**: Installs build tools and required libraries (git, build-essential, etc.)
 4. **MongoDB Installation**: Installs and configures MongoDB 7.0
 5. **User Creation**: Creates a dedicated `artorize` system user
-6. **Repository Clone**: Clones the GitHub repository to `/opt/artorize-backend`
-7. **Backup**: Backs up existing installations before updating
-8. **Application Setup**: Installs npm dependencies as the application user
-9. **Configuration**: Creates or restores runtime configuration file
-10. **Systemd Service**: Sets up automatic startup and process management with security hardening
-11. **Nginx Setup**: Configures reverse proxy with proper headers (optional)
-12. **Firewall**: Configures UFW to allow HTTP/HTTPS traffic
-13. **Service Start**: Starts and enables the application
+6. **Repository Clone**: Clones the GitHub repository to `/opt/artorize-backend` (preserves existing config)
+7. **Application Setup**: Installs npm dependencies as the application user
+8. **Configuration**: Creates or restores runtime configuration file
+9. **Systemd Service**: Sets up automatic startup and process management with security hardening
+10. **Nginx Setup**: Configures reverse proxy with proper headers (optional)
+11. **Firewall**: Configures UFW to allow HTTP/HTTPS traffic
+12. **Service Start**: Starts and enables the application
 
 ## Post-Deployment Steps
 

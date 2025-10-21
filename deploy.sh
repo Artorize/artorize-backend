@@ -190,30 +190,28 @@ fi
 # Step 6: Clone repository
 log_info "Cloning repository from $REPO_URL (branch: $REPO_BRANCH)..."
 
-# Backup existing installation if it exists
+# Preserve existing config if it exists
+SAVED_CONFIG=""
+if [ -f "$APP_DIR/config/runtime.json" ]; then
+    log_info "Preserving existing configuration..."
+    SAVED_CONFIG=$(cat "$APP_DIR/config/runtime.json")
+fi
+
+# Remove old installation if it exists
 if [ -d "$APP_DIR" ]; then
-    BACKUP_DIR="/var/backups/artorize"
-    mkdir -p "$BACKUP_DIR"
-    BACKUP_NAME="artorize-backup-$(date +%Y%m%d-%H%M%S).tar.gz"
-    log_info "Backing up existing installation to $BACKUP_DIR/$BACKUP_NAME..."
-    tar -czf "$BACKUP_DIR/$BACKUP_NAME" -C "$(dirname $APP_DIR)" "$(basename $APP_DIR)" 2>/dev/null || true
-
-    # Save config for restore
-    if [ -f "$APP_DIR/config/runtime.json" ]; then
-        cp "$APP_DIR/config/runtime.json" "$BACKUP_DIR/runtime.json.backup"
-    fi
-
-    # Remove old installation
+    log_info "Removing old installation..."
     rm -rf "$APP_DIR"
 fi
 
 # Clone repository
 git clone --branch "$REPO_BRANCH" "$REPO_URL" "$APP_DIR"
 
-# Restore config if backup exists
-if [ -f "/var/backups/artorize/runtime.json.backup" ]; then
-    log_info "Restoring configuration from backup..."
-    cp "/var/backups/artorize/runtime.json.backup" "$APP_DIR/config/runtime.json"
+# Restore preserved config
+if [ -n "$SAVED_CONFIG" ]; then
+    log_info "Restoring configuration..."
+    mkdir -p "$APP_DIR/config"
+    echo "$SAVED_CONFIG" > "$APP_DIR/config/runtime.json"
+    chown "$APP_USER:$APP_USER" "$APP_DIR/config/runtime.json"
 fi
 
 # Set ownership
