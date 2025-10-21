@@ -241,13 +241,11 @@ if [ ! -f "$APP_DIR/config/runtime.json" ]; then
 {
   "environment": "$ENV_TYPE",
   "port": $APP_PORT,
-  "mongodb": {
+  "mongo": {
     "uri": "mongodb://localhost:27017",
-    "database": "artorize"
+    "dbName": "artorize"
   },
-  "logging": {
-    "level": "info"
-  }
+  "logLevel": "info"
 }
 EOF
     chown "$APP_USER:$APP_USER" "$APP_DIR/config/runtime.json"
@@ -270,8 +268,7 @@ Type=simple
 User=$APP_USER
 WorkingDirectory=$APP_DIR
 Environment=NODE_ENV=$ENV_TYPE
-Environment=APP_CONFIG_PATH=$APP_DIR/config/runtime.json
-ExecStart=/usr/bin/node $APP_DIR/src/server.js
+ExecStart=/usr/bin/node $APP_DIR/src/server.js --config=$APP_DIR/config/runtime.json
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal

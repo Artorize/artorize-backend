@@ -175,7 +175,7 @@ Comprehensive service health status with component-level diagnostics.
     "mongodb": {
       "status": "healthy",
       "connected": true,
-      "database": "artgallery",
+      "database": "artorize",
       "version": "7.0.0",
       "uptime": 86400
     },
@@ -218,7 +218,7 @@ Comprehensive service health status with component-level diagnostics.
     "mongodb": {
       "status": "healthy",
       "connected": true,
-      "database": "artgallery",
+      "database": "artorize",
       "version": "7.0.0",
       "uptime": 86400
     },

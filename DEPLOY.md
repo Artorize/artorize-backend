@@ -131,13 +131,11 @@ Example production configuration:
 {
   "environment": "production",
   "port": 5001,
-  "mongodb": {
+  "mongo": {
     "uri": "mongodb://localhost:27017",
-    "database": "artorize"
+    "dbName": "artorize"
   },
-  "logging": {
-    "level": "info"
-  }
+  "logLevel": "info"
 }
 ```
 
@@ -226,9 +224,9 @@ sudo nano /opt/artorize-backend/config/runtime.json
 Update MongoDB URI:
 ```json
 {
-  "mongodb": {
+  "mongo": {
     "uri": "mongodb://artorize_app:your-app-password@localhost:27017/artorize?authSource=artorize",
-    "database": "artorize"
+    "dbName": "artorize"
   }
 }
 ```
