@@ -27,6 +27,7 @@ async function checkMongoHealth() {
       database: db.databaseName,
       version: serverStatus.version,
       uptime: serverStatus.uptime,
+      message: 'MongoDB connection active',
     };
   } catch (error) {
     logger.error({ err: error }, 'MongoDB health check failed');
@@ -65,15 +66,21 @@ async function checkGridFSHealth() {
 
     const allBucketsExist = existingBuckets.length === expectedBuckets.length;
 
+    // GridFS buckets are created on-demand, so missing buckets are not a problem
+    // Only mark as unhealthy if we can't check collections at all
     return {
-      status: allBucketsExist ? 'healthy' : 'degraded',
+      status: 'healthy',
       bucketsFound: existingBuckets.length,
       bucketsExpected: expectedBuckets.length,
+      bucketsReady: allBucketsExist,
       buckets: {
         originals: collectionNames.includes('artwork_originals.files'),
         protected: collectionNames.includes('artwork_protected.files'),
         masks: collectionNames.includes('artwork_masks.files'),
       },
+      message: allBucketsExist
+        ? 'All GridFS buckets initialized'
+        : 'GridFS buckets will be created on first upload',
     };
   } catch (error) {
     logger.error({ err: error }, 'GridFS health check failed');
@@ -106,6 +113,9 @@ async function checkHashStorageHealth() {
       status: 'healthy',
       artworksCount: count,
       indexesConfigured: hasHashIndexes,
+      message: count > 0
+        ? `${count} artwork(s) stored`
+        : 'Ready to store artworks',
     };
   } catch (error) {
     logger.error({ err: error }, 'Hash storage health check failed');
@@ -147,11 +157,24 @@ async function healthCheck(req, res) {
 
     const responseTime = Date.now() - startTime;
 
+    // Create component status summary
+    const componentStatuses = {
+      mongodb: mongoHealth.status,
+      gridfs: gridfsHealth.status,
+      hashStorage: hashStorageHealth.status,
+    };
+
     const healthData = {
       status: overallStatus,
+      message: overallStatus === 'healthy'
+        ? 'All systems operational'
+        : overallStatus === 'degraded'
+        ? 'Some components degraded'
+        : 'System unhealthy',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       responseTime,
+      summary: componentStatuses,
       components: {
         mongodb: mongoHealth,
         gridfs: gridfsHealth,
