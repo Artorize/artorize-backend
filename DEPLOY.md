@@ -2,11 +2,24 @@
 
 This guide covers deploying the Artorize Backend to a Debian 12 server using the automated deployment script.
 
+## Security Architecture
+
+**CRITICAL:** This application binds to `127.0.0.1` (localhost only) for security. It **must** be deployed behind nginx (or another reverse proxy) and should **never** be directly exposed to the internet on `0.0.0.0`.
+
+The automated deployment script handles this configuration correctly:
+- Application listens on `127.0.0.1:5001` (localhost only)
+- Nginx reverse proxy listens on `0.0.0.0:80/443` (public)
+- Only nginx is accessible from the internet
+- All external traffic is proxied through nginx with proper security headers
+
+**WARNING:** Do not skip nginx installation (`--skip-nginx`) in production environments. This flag is only for development or when using an alternative reverse proxy.
+
 ## Prerequisites
 
 - Fresh Debian 12 server with root access
 - SSH access to the server
 - Domain name (optional, for production with SSL)
+- **Nginx** (automatically installed by deployment script, **required for production**)
 
 ## Quick Start
 
@@ -64,8 +77,9 @@ Options:
 sudo ./deploy.sh --production --domain api.artorize.com
 ```
 
-**Development deployment without Nginx:**
+**Development deployment without Nginx (NOT RECOMMENDED FOR PRODUCTION):**
 ```bash
+# Only use this for local development or when using an alternative reverse proxy
 sudo ./deploy.sh --skip-nginx
 ```
 
@@ -368,6 +382,25 @@ sudo ufw allow from your-ip-address to any port 22
 sudo ufw delete allow 22/tcp
 ```
 
+### Application Network Security
+
+**Critical security features:**
+- Application binds to `127.0.0.1` only (not accessible from outside the server)
+- All external access **must** go through nginx reverse proxy
+- Never expose the application port (default: 5001) directly to the internet
+- Never bind to `0.0.0.0` in production
+
+**Verifying security:**
+```bash
+# Check that application is only listening on localhost
+sudo netstat -tlnp | grep node
+# Should show: 127.0.0.1:5001 (NOT 0.0.0.0:5001)
+
+# Check nginx is listening on public interfaces
+sudo netstat -tlnp | grep nginx
+# Should show: 0.0.0.0:80 and 0.0.0.0:443
+```
+
 ### MongoDB Security
 
 - Enable authentication (see post-deployment steps)
@@ -375,10 +408,10 @@ sudo ufw delete allow 22/tcp
 - Use strong passwords
 - Regularly update MongoDB
 
-### Application Security
+### Additional Application Security
 
 - Keep Node.js and npm packages updated
-- Use SSL/TLS in production
+- Use SSL/TLS in production (via nginx)
 - Configure proper CORS settings
 - Review and update security headers in Nginx
 - Enable rate limiting (already configured in application)

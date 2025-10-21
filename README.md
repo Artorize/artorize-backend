@@ -9,6 +9,7 @@ Node.js + Express service for ingesting original/protected artwork assets with a
 - [x] GridFS streaming for originals, variant selection, and structured metadata retrieval.
 - [x] Artist/tag/text search backed by MongoDB indexes.
 - [x] Production hardening: input validation (Zod), rate limiting, security headers (Helmet), structured logging (pino/pino-http), and deploy scripts.
+- [x] Security-first design: binds to localhost only (127.0.0.1), designed to work behind nginx reverse proxy.
 
 ## Project Structure
 
@@ -58,6 +59,18 @@ Settings are loaded from `config/runtime.json`. The deployment helper will mater
 | `mongo.uri` | Mongo connection string (replica set or Atlas). | `mongodb://localhost:27017` |
 | `mongo.dbName` | Database used to store metadata & GridFS buckets. | `artorize` |
 | `logLevel` | pino logging level (`debug`, `info`, etc.). | `info` |
+
+## Security Architecture
+
+**IMPORTANT:** This application binds to `127.0.0.1` (localhost only) for security. It is designed to work behind a reverse proxy (nginx) and should **not** be directly exposed to the internet.
+
+The deployment script automatically configures nginx as a reverse proxy with:
+- Proper security headers
+- Request size limits
+- Rate limiting support
+- SSL/TLS termination (when domain is provided)
+
+**Do not** bypass nginx or expose the application port directly unless in a controlled development environment.
 
 ## Deployment
 
@@ -130,6 +143,8 @@ npm run dev
 ```
 
 Configuration will be loaded from `config/runtime.json`. Create it manually or let the deployment script generate a default one.
+
+**Note for local development:** The service binds to `127.0.0.1` and is accessible at `http://localhost:<port>` on the machine where it runs. For remote access during development, use SSH port forwarding or temporarily modify the host binding in `src/server.js` (not recommended for production).
 
 ### Service Management
 

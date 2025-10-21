@@ -33,8 +33,8 @@ async function start() {
     }
 
     server = http.createServer(app);
-    server.listen(config.port, () => {
-      logger.info({ port: config.port }, 'artscraper backend listening');
+    server.listen(config.port, '127.0.0.1', () => {
+      logger.info({ port: config.port, host: '127.0.0.1' }, 'artscraper backend listening');
     });
   } catch (err) {
     logger.error({ err }, 'Failed to start server');
