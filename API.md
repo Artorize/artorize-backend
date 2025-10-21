@@ -168,31 +168,41 @@ Comprehensive service health status with component-level diagnostics.
 ```json
 {
   "status": "healthy",
+  "message": "All systems operational",
   "timestamp": "2025-10-20T10:30:45.123Z",
   "uptime": 86400.5,
   "responseTime": 45,
+  "summary": {
+    "mongodb": "healthy",
+    "gridfs": "healthy",
+    "hashStorage": "healthy"
+  },
   "components": {
     "mongodb": {
       "status": "healthy",
       "connected": true,
       "database": "artorize",
       "version": "7.0.0",
-      "uptime": 86400
+      "uptime": 86400,
+      "message": "MongoDB connection active"
     },
     "gridfs": {
       "status": "healthy",
       "bucketsFound": 6,
       "bucketsExpected": 6,
+      "bucketsReady": true,
       "buckets": {
         "originals": true,
         "protected": true,
         "masks": true
-      }
+      },
+      "message": "All GridFS buckets initialized"
     },
     "hashStorage": {
       "status": "healthy",
       "artworksCount": 1234,
-      "indexesConfigured": true
+      "indexesConfigured": true,
+      "message": "1234 artwork(s) stored"
     }
   },
   "system": {
@@ -207,44 +217,54 @@ Comprehensive service health status with component-level diagnostics.
 }
 ```
 
-**Degraded Response Example** (partial service availability):
+**Fresh Installation Response Example** (no data yet):
 ```json
 {
-  "status": "degraded",
+  "status": "healthy",
+  "message": "All systems operational",
   "timestamp": "2025-10-20T10:30:45.123Z",
-  "uptime": 86400.5,
-  "responseTime": 52,
+  "uptime": 120.5,
+  "responseTime": 42,
+  "summary": {
+    "mongodb": "healthy",
+    "gridfs": "healthy",
+    "hashStorage": "healthy"
+  },
   "components": {
     "mongodb": {
       "status": "healthy",
       "connected": true,
       "database": "artorize",
       "version": "7.0.0",
-      "uptime": 86400
+      "uptime": 86400,
+      "message": "MongoDB connection active"
     },
     "gridfs": {
-      "status": "degraded",
-      "bucketsFound": 4,
+      "status": "healthy",
+      "bucketsFound": 0,
       "bucketsExpected": 6,
+      "bucketsReady": false,
       "buckets": {
-        "originals": true,
-        "protected": true,
+        "originals": false,
+        "protected": false,
         "masks": false
-      }
+      },
+      "message": "GridFS buckets will be created on first upload"
     },
     "hashStorage": {
       "status": "healthy",
-      "artworksCount": 1234,
-      "indexesConfigured": true
+      "artworksCount": 0,
+      "indexesConfigured": false,
+      "message": "Ready to store artworks"
     }
   },
   "system": {
     "nodeVersion": "v18.17.0",
     "platform": "linux",
     "memory": {
-      "heapUsed": 85,
-      "heapTotal": 120,
-      "rss": 150
+      "heapUsed": 45,
+      "heapTotal": 80,
+      "rss": 95
     }
   }
 }
@@ -258,9 +278,13 @@ Comprehensive service health status with component-level diagnostics.
 
 **Notes**:
 - Health endpoint is **exempt from rate limiting** for monitoring purposes
-- Returns HTTP 503 when overall status is `unhealthy`
-- Memory values are in MB
-- `responseTime` is in milliseconds
+- Returns HTTP 503 when overall status is `unhealthy`, HTTP 200 otherwise
+- **Quick status check**: Use the `summary` field for at-a-glance component status
+- **Detailed diagnostics**: Check the `components` field for full component details
+- Each component includes a human-readable `message` field explaining its status
+- GridFS buckets are created on-demand when first file is uploaded
+- Fresh installations show `bucketsReady: false` but are still `healthy`
+- Memory values are in MB, `responseTime` is in milliseconds
 
 ---
 
