@@ -58,7 +58,7 @@ The application uses a JSON-based configuration system (`config/runtime.json`):
 GridFS is used with three separate buckets:
 - `artwork_originals`: Original uploaded images
 - `artwork_protected`: Protected derivative images
-- `artwork_masks`: High/low resolution mask files (SAC v1 binary format)
+- `artwork_masks`: Grayscale mask files (SAC v1 binary format)
 
 Files are stored in 1MB chunks with SHA256 checksums for integrity verification.
 
@@ -81,7 +81,7 @@ The following indexes are auto-created on startup:
 ### API Endpoints
 - `POST /artworks` - Upload artwork with multiple file variants
 - `GET /artworks/:id` - Stream artwork file (use `?variant=` query param)
-- `GET /artworks/:id/mask` - Stream mask file in SAC v1 format (use `?resolution=hi|lo`)
+- `GET /artworks/:id/mask` - Stream grayscale mask file in SAC v1 format
 - `GET /artworks/:id/metadata` - Get artwork metadata
 - `GET /artworks` - Search artworks (supports artist, tags, text queries)
 - `GET /artworks/check-exists` - Check if artwork already exists (supports id, checksum, title+artist, tags)
@@ -93,8 +93,7 @@ The following indexes are auto-created on startup:
 When uploading artwork, the multipart form expects:
 - `original`: Original image file (JPEG/PNG/WebP/AVIF/GIF)
 - `protected`: Protected variant file (same formats)
-- `maskHi`: High-resolution mask (SAC v1 binary, .sac extension)
-- `maskLo`: Low-resolution mask (SAC v1 binary, .sac extension)
+- `mask`: Grayscale mask file (SAC v1 binary, .sac extension)
 - `analysis`: Analysis JSON document
 - `summary`: Summary JSON document
 - Additional metadata fields: `title`, `artist`, `description`, `tags`, etc.

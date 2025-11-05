@@ -299,8 +299,7 @@ Upload artwork with multiple file variants.
 **Required Files**:
 - `original` - Original image (JPEG/PNG/WebP/AVIF/GIF, max 256MB)
 - `protected` - Protected variant (same formats)
-- `maskHi` - High-res mask (SAC v1 binary format, .sac extension)
-- `maskLo` - Low-res mask (SAC v1 binary format, .sac extension)
+- `mask` - Grayscale mask file (SAC v1 binary format, .sac extension)
 - `analysis` - Analysis JSON document
 - `summary` - Summary JSON document
 
@@ -324,8 +323,7 @@ Upload artwork with multiple file variants.
       "fileId": "60f7b3b3b3b3b3b3b3b3b3b4"
     },
     "protected": { /* ... */ },
-    "mask_hi": { /* ... */ },
-    "mask_lo": { /* ... */ }
+    "mask": { /* ... */ }
   }
 }
 ```
@@ -343,7 +341,7 @@ Upload artwork with multiple file variants.
 Stream artwork file.
 
 **Parameters**:
-- `variant` (query) - `original|protected|mask_hi|mask_lo` (default: `original`)
+- `variant` (query) - `original|protected|mask` (default: `original`)
 
 **Response**: `200 OK`
 - Binary file stream with proper MIME type
@@ -352,7 +350,7 @@ Stream artwork file.
 - Cache headers: `public, max-age=31536000, immutable`
 - ETag: `{id}-{variant}`
 
-**Note**: For mask files, prefer using the dedicated `/artworks/{id}/mask` endpoint with the `resolution` parameter.
+**Note**: For mask files, you can also use the dedicated `/artworks/{id}/mask` endpoint.
 
 **Errors**:
 - `400` - Invalid ID format
@@ -413,28 +411,24 @@ Available variant information.
 ---
 
 ### `GET /artworks/{id}/mask`
-Stream artwork mask file in SAC v1 binary format.
-
-**Parameters**:
-- `resolution` (query) - `hi|lo` (default: `hi`)
+Stream artwork grayscale mask file in SAC v1 binary format.
 
 **Response**: `200 OK`
 - Binary SAC v1 file stream (application/octet-stream)
 - Cache headers: `public, max-age=31536000, immutable`
-- ETag: `{id}-mask_{resolution}`
-- Content-Disposition: `inline; filename="{title}-mask-{resolution}.sac"`
+- ETag: `{id}-mask`
+- Content-Disposition: `inline; filename="{title}-mask.sac"`
 
 **Example**:
 ```bash
-# Get high-resolution mask (default)
+# Get grayscale mask
 curl http://localhost:3000/artworks/{id}/mask
-
-# Get low-resolution mask
-curl http://localhost:3000/artworks/{id}/mask?resolution=lo
 
 # Save to file
 curl http://localhost:3000/artworks/{id}/mask -o mask.sac
 ```
+
+**Note**: The mask is stored in grayscale format using SAC v1 protocol. According to the poison mask grayscale protocol, this provides 3x smaller file sizes and 8.6x faster generation compared to RGB masks, with only minor quality loss (32.98 dB PSNR).
 
 **Errors**:
 - `400` - Invalid ID format
@@ -648,8 +642,7 @@ curl -X POST http://localhost:3000/artworks \
   -H "Authorization: Bearer $TOKEN" \
   -F "original=@image.jpg" \
   -F "protected=@protected.jpg" \
-  -F "maskHi=@mask_hi.sac" \
-  -F "maskLo=@mask_lo.sac" \
+  -F "mask=@mask.sac" \
   -F "analysis=@analysis.json" \
   -F "summary=@summary.json" \
   -F "title=My Artwork" \
@@ -675,8 +668,7 @@ curl -X POST http://localhost:3000/artworks \
   -H "Authorization: Bearer $TOKEN" \
   -F "original=@mona_lisa.jpg;type=image/jpeg" \
   -F "protected=@mona_lisa_protected.jpg;type=image/jpeg" \
-  -F "maskHi=@mask_hi.sac;type=application/octet-stream" \
-  -F "maskLo=@mask_lo.sac;type=application/octet-stream" \
+  -F "mask=@mask.sac;type=application/octet-stream" \
   -F "analysis=@analysis.json;type=application/json" \
   -F "summary=@summary.json;type=application/json" \
   -F "title=Mona Lisa" \
@@ -712,14 +704,11 @@ curl "http://localhost:3000/artworks?artist=Picasso&limit=10&skip=20"
 
 ### Mask Retrieval Example
 ```bash
-# Get high-resolution mask (default)
-curl "http://localhost:3000/artworks/{id}/mask" -o mask-hi.sac
+# Get grayscale mask
+curl "http://localhost:3000/artworks/{id}/mask" -o mask.sac
 
-# Get low-resolution mask
-curl "http://localhost:3000/artworks/{id}/mask?resolution=lo" -o mask-lo.sac
-
-# Alternative: using variant parameter (legacy)
-curl "http://localhost:3000/artworks/{id}?variant=mask_hi" -o mask-hi.sac
+# Alternative: using variant parameter
+curl "http://localhost:3000/artworks/{id}?variant=mask" -o mask.sac
 ```
 
 ### Check Existence Example
