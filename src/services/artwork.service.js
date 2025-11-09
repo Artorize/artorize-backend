@@ -294,18 +294,24 @@ async function checkArtworkExists({ id, checksum, title, artist, tags }) {
 
   const queries = [];
 
+  // Check by ID
   if (id) {
     try {
-      queries.push({ _id: new ObjectId(id) });
+      const objectId = new ObjectId(id);
+      queries.push({ _id: objectId });
     } catch (e) {
-      // Invalid ObjectId format
+      // Invalid ObjectId format - this should be caught by validator
+      // but we handle it defensively by skipping this criterion
+      // This allows other search criteria to still work
     }
   }
 
+  // Check by checksum
   if (checksum) {
     queries.push({ checksum: checksum });
   }
 
+  // Check by title AND artist (both required together)
   if (title && artist) {
     queries.push({
       title: title,
@@ -313,14 +319,17 @@ async function checkArtworkExists({ id, checksum, title, artist, tags }) {
     });
   }
 
+  // Check by tags (must have ALL specified tags)
   if (tags && Array.isArray(tags) && tags.length > 0) {
     queries.push({ tags: { $all: tags } });
   }
 
+  // If no valid queries were built, return no matches
   if (queries.length === 0) {
-    return { exists: false, matches: [] };
+    return { exists: false, matches: [], matchCount: 0 };
   }
 
+  // Find matches using OR logic (match any criteria)
   const matches = await collection.find(
     { $or: queries },
     {
