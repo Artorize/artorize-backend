@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "version": "node src/server.js --version",
     "test": "mocha tests/**/*.test.js --timeout 10000 --exit",
     "test:watch": "mocha tests/**/*.test.js --watch",
     "test:coverage": "nyc --reporter=html --reporter=text mocha tests/**/*.test.js --timeout 10000 --exit",
