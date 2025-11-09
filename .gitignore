@@ -137,3 +137,4 @@ dist
 config/runtime.json
 /inputdata/
 /tests/test-data/
+.last-update
