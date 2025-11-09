@@ -1,3 +1,40 @@
+// Handle CLI arguments FIRST before loading any dependencies
+// This allows --version and --help to work without installing dependencies
+const args = process.argv.slice(2);
+
+if (args.includes('--version') || args.includes('-v')) {
+  const { formatVersionInfo } = require('./utils/version');
+  console.log(formatVersionInfo());
+  process.exit(0);
+}
+
+if (args.includes('--help') || args.includes('-h')) {
+  console.log(`
+Artorize Backend - Artwork Storage Service
+
+Usage:
+  npm start [options]
+  node src/server.js [options]
+
+Options:
+  --version, -v     Show version information and exit
+  --help, -h        Show this help message and exit
+  --config <path>   Specify config file path (default: config/runtime.json)
+
+Environment Variables:
+  AUTO_UPDATE       Enable/disable self-update on startup (default: true)
+  APP_CONFIG_PATH   Path to configuration file
+  NODE_ENV          Environment mode (development, production)
+
+Examples:
+  npm start
+  npm start -- --version
+  node src/server.js --config config/custom.json
+  `.trim());
+  process.exit(0);
+}
+
+// Now load heavy dependencies only if we're actually starting the server
 const http = require('http');
 const app = require('./app');
 const config = require('./config/env');
@@ -5,12 +42,37 @@ const { connectMongo, disconnectMongo } = require('./config/mongo');
 const { ensureIndexes } = require('./config/indexes');
 const { cleanupTokens } = require('./services/token.service');
 const logger = require('./config/logger');
+const { performSelfUpdate } = require('./utils/self-update');
 
 let server;
 let cleanupInterval;
 
 async function start() {
   try {
+    // Perform self-update if enabled
+    const autoUpdate = process.env.AUTO_UPDATE !== 'false'; // Default to true
+    if (autoUpdate) {
+      logger.info('Self-update check enabled');
+      try {
+        const updateResult = await performSelfUpdate(logger, {
+          skipIfDirty: true
+        });
+
+        if (updateResult.updated) {
+          logger.warn(
+            { oldCommit: updateResult.oldCommit, newCommit: updateResult.newCommit },
+            'Application was updated. Please restart the service to apply changes.'
+          );
+          // Note: In production with systemd, the service should be restarted manually
+          // or configured with Restart=always to auto-restart on exit
+        }
+      } catch (error) {
+        logger.warn({ error: error.message }, 'Self-update check failed, continuing with startup');
+      }
+    } else {
+      logger.info('Self-update check disabled via AUTO_UPDATE=false');
+    }
+
     await connectMongo();
     await ensureIndexes();
 
@@ -72,4 +134,5 @@ process.on('uncaughtException', (err) => {
   shutdown('uncaughtException').catch(() => process.exit(1));
 });
 
+// Start the server
 start();

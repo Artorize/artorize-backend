@@ -24,6 +24,26 @@ node tests/sac-encoder.test.js        # Test SAC encoder/decoder
 node tests/sac-integration.test.js    # Generate test SAC files and sample data
 ```
 
+### Version & Updates
+```bash
+npm run version          # Show version, commit, branch, and last update time
+node src/server.js -v    # Alternative: show version information
+node src/server.js --help # Show all available CLI options
+```
+
+**Self-Update on Startup:**
+The application automatically checks for updates from the git repository on each startup. This can be controlled via:
+- `AUTO_UPDATE=false npm start` - Disable automatic updates
+- Default behavior: Updates are pulled automatically if available
+- Updates are skipped if there are uncommitted local changes
+- After update, the service should be restarted to apply changes
+
+**Version Tracking:**
+- Version number from `package.json`
+- Git commit hash and branch
+- Last update timestamp (stored in `.last-update` file)
+- Use `npm run version` to see current version details
+
 ## Architecture Overview
 
 This is a Node.js/Express backend service for artwork storage using MongoDB GridFS. The application follows a layered MVC architecture:

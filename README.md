@@ -160,6 +160,57 @@ sudo systemctl restart artorize-backend
 
 # Stop service
 sudo systemctl stop artorize-backend
+
+# Check version and last update
+npm run version
+# Or: node src/server.js --version
+```
+
+### Version Management & Self-Update
+
+The application includes built-in version tracking and self-update functionality:
+
+**Check Version:**
+```bash
+# Using npm script
+npm run version
+
+# Direct command
+node src/server.js --version
+
+# Sample output:
+# Artorize Backend v1.0.0
+#   Commit: ca63093
+#   Branch: main
+#   Last Update: 2025-11-09T10:30:00.000Z (2 hours ago)
+```
+
+**Auto-Update on Startup:**
+By default, the application checks for updates from the git repository on each startup and automatically pulls new changes if available. This behavior can be controlled:
+
+```bash
+# Disable auto-update (one-time)
+AUTO_UPDATE=false npm start
+
+# Disable auto-update (systemd service)
+# Edit /etc/systemd/system/artorize-backend.service
+# Add: Environment="AUTO_UPDATE=false"
+```
+
+**Update Behavior:**
+- Updates are pulled from the configured git remote (default: origin)
+- Updates are skipped if there are uncommitted local changes
+- After successful update, the service should be restarted to apply changes
+- If `package.json` or `package-lock.json` changed, run `npm install`
+- Update timestamp is stored in `.last-update` file
+
+**Manual Update:**
+```bash
+# Update to latest version
+cd /opt/artorize-backend
+sudo git pull origin main
+sudo npm install  # If dependencies changed
+sudo systemctl restart artorize-backend
 ```
 
 ### CI/CD Integration
