@@ -70,6 +70,7 @@ async function createArtwork({
   analysisJson,
   summaryJson,
   body = {},
+  userId = null,
 }) {
   ensureFilePresence(originalFile, 'original image');
   ensureFilePresence(protectedFile, 'protected image');
@@ -193,6 +194,7 @@ async function createArtwork({
     summary: summaryJson || null,
     extra: parseExtra(body.extra),
     uploadedAt: new Date(),
+    userId: userId || null,
   };
 
   // Process and add hashes if provided
@@ -226,7 +228,7 @@ async function getArtworkById(id) {
   return db.collection('artworks_meta').findOne({ _id: new ObjectId(id) });
 }
 
-async function searchArtworks({ artist, tags, text, limit = 20, skip = 0 }) {
+async function searchArtworks({ artist, tags, text, userId, limit = 20, skip = 0 }) {
   const db = getDb();
   const filter = {};
   if (artist) filter.artist = artist;
@@ -234,11 +236,23 @@ async function searchArtworks({ artist, tags, text, limit = 20, skip = 0 }) {
     filter.tags = { $all: tags };
   }
   if (text) filter.$text = { $search: text };
+  if (userId) filter.userId = userId;
 
   return db
     .collection('artworks_meta')
     .find(filter)
     .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(Math.min(limit, 100))
+    .toArray();
+}
+
+async function getArtworksByUser(userId, { limit = 20, skip = 0 } = {}) {
+  const db = getDb();
+  return db
+    .collection('artworks_meta')
+    .find({ userId })
+    .sort({ uploadedAt: -1 })
     .skip(skip)
     .limit(Math.min(limit, 100))
     .toArray();
@@ -357,6 +371,7 @@ module.exports = {
   getArtworkById,
   searchArtworks,
   getArtworksByIds,
+  getArtworksByUser,
   getAllVariants,
   checkArtworkExists,
 };
