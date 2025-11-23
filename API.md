@@ -44,37 +44,90 @@ Used for secure processor uploads in the Artorize architecture.
 
 **Security Benefits**:
 - **One-time tokens**: Each token can only be used once, preventing replay attacks
-- **Time-limited**: Tokens expire after 1 hour (configurable)
+- **Time-limited**: Tokens expire after 1 hour (configurable, max 24 hours)
 - **Per-artwork isolation**: Compromised token affects only one artwork
 - **No static credentials**: Eliminates risk of leaked API keys
 
-### 2. Session-Based Authentication (User Authentication)
+### 2. Session-Based Authentication (User Authentication via Router)
 
-Used for user-specific operations when accessed via the router with Better Auth integration.
+Used for user-specific operations when accessed via the Artorize router with Better Auth integration.
 
 **How It Works**:
 
 1. **User authenticates via router** using Better Auth (Google/GitHub OAuth)
 2. **Router sets session cookie** (`better-auth.session_token`)
-3. **Router forwards user info** via custom headers (`X-User-Id`, `X-User-Email`, `X-User-Name`)
-4. **Backend validates session** and associates artworks with user
+3. **Router validates session** against Better Auth/PostgreSQL
+4. **Router forwards user info** via custom headers when proxying to backend:
+   - `X-User-Id`: User's unique identifier
+   - `X-User-Email`: User's email address
+   - `X-User-Name`: User's display name
+5. **Backend validates headers** and associates artworks with user
+
+**IMPORTANT**: The backend does NOT validate the `better-auth.session_token` cookie directly. It relies on the router to:
+- Validate the session against Better Auth
+- Forward user information via headers
+- Only send headers for valid, authenticated sessions
 
 **User-Specific Features**:
-- Artworks are automatically associated with the authenticated user
+- Artworks are automatically associated with the authenticated user (`userId` field)
 - Users can retrieve only their own artworks via `/artworks/me`
 - Search can be filtered by user ID
+- Upload tracking and ownership management
 
 ### Protected Endpoints
 
 - `POST /artworks` - **Requires authentication** (token or session)
+  - With token: Artwork uploaded without user association (`userId: null`)
+  - With session: Artwork associated with authenticated user
 - `GET /artworks/me` - **Requires user authentication** (session only)
+  - Must have valid `X-User-Id` header from router
 
 ### Public Endpoints
 
 All read endpoints remain public:
 - `GET /artworks` - Search (can optionally filter by userId)
-- `GET /artworks/{id}/*` - Metadata, file streaming
+- `GET /artworks/{id}/*` - Metadata, file streaming, downloads
 - `GET /health` - Health checks
+- `GET /artworks/check-exists` - Duplication checking
+
+## Router Integration
+
+This backend is designed to work seamlessly with the Artorize router (Fastify + Better Auth).
+
+**Architecture:**
+```
+User → Router (Fastify) → Backend (Express) → MongoDB
+       [Better Auth]      [GridFS Storage]
+```
+
+**Key Integration Points:**
+
+1. **User Authentication Flow**:
+   - Router handles all user authentication via Better Auth
+   - Router validates sessions and forwards user context via headers
+   - Backend trusts headers from router (assumes router is the only client)
+
+2. **Processor Upload Flow**:
+   - Router generates tokens via `POST /tokens`
+   - Router passes tokens to processor
+   - Processor uploads directly to backend with token
+
+3. **Security Model**:
+   - Backend binds to `127.0.0.1` (localhost only)
+   - Router acts as reverse proxy for external access
+   - Only router can reach backend (firewall protected)
+
+**For detailed integration requirements, see `ROUTER_INTEGRATION.md`.**
+
+### Router Requirements
+
+The router MUST:
+1. ✅ Forward `X-User-Id` header when user is authenticated
+2. ✅ Forward `X-User-Email` header when user is authenticated
+3. ✅ Forward `X-User-Name` header when user is authenticated
+4. ✅ Only forward headers for valid, authenticated sessions
+5. ✅ Call `POST /tokens` to generate tokens for processor uploads
+6. ✅ Act as reverse proxy since backend binds to localhost only
 
 ---
 

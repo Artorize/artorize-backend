@@ -55,6 +55,54 @@ This is a Node.js/Express backend service for artwork storage using MongoDB Grid
 - **Services**: `src/services/artwork.service.js` contains core business logic
 - **Storage Layer**: `src/storage/gridfs.js` manages GridFS buckets for file storage
 - **Validation**: `src/validators/artwork.validators.js` uses Zod schemas for input validation
+- **Authentication**: `src/middlewares/auth.js` handles dual authentication (tokens + sessions)
+- **Token Management**: `src/services/token.service.js` manages authentication tokens
+
+### Integration Architecture
+
+This backend is designed to work with the Artorize router (Fastify + Better Auth):
+
+```
+┌─────────┐         ┌──────────┐         ┌─────────────┐         ┌─────────────┐
+│  User   │────────▶│  Router  │────────▶│   Backend   │────────▶│  MongoDB    │
+│         │         │ (Fastify)│         │  (Express)  │         │  GridFS     │
+└─────────┘         └──────────┘         └─────────────┘         └─────────────┘
+                          │
+                          │ Better Auth
+                          ▼
+                   ┌──────────────┐
+                   │  PostgreSQL  │
+                   └──────────────┘
+```
+
+**Key Integration Points:**
+- Router validates user sessions via Better Auth (PostgreSQL)
+- Router forwards user context to backend via custom headers (`X-User-Id`, `X-User-Email`, `X-User-Name`)
+- Backend trusts headers from router (router is the only client - localhost binding enforced)
+- Router generates authentication tokens for processor uploads via `POST /tokens`
+- Backend validates tokens for processor uploads via bearer token authentication
+
+**For detailed integration requirements**, see `ROUTER_INTEGRATION.md`.
+
+### Authentication Architecture
+
+The backend supports **dual authentication**:
+
+1. **Session-Based Authentication (User Operations)**:
+   - Router validates user sessions via Better Auth
+   - Router forwards user info via `X-User-Id`, `X-User-Email`, `X-User-Name` headers
+   - Backend extracts user context from headers
+   - Used for user-specific operations like `GET /artworks/me`
+   - Artworks uploaded with session auth are associated with user (`userId` field)
+
+2. **Token-Based Authentication (Processor Uploads)**:
+   - Router generates one-time tokens via `POST /tokens`
+   - Tokens are cryptographically random, single-use, time-limited (1 hour default)
+   - Processor includes token in `Authorization: Bearer <token>` header
+   - Backend validates and consumes token on upload
+   - Artworks uploaded with tokens have `userId: null`
+
+**IMPORTANT**: The backend does NOT validate `better-auth.session_token` cookies directly. It relies on the router to validate sessions and forward user information via headers. This architecture assumes the router is the only client (enforced by localhost binding).
 
 ### Security Architecture
 
@@ -99,12 +147,26 @@ The following indexes are auto-created on startup:
 - Pino structured logging with auth header redaction
 
 ### API Endpoints
-- `POST /artworks` - Upload artwork with multiple file variants
+
+**Authentication Endpoints:**
+- `POST /tokens` - Generate authentication token (for processor uploads)
+- `DELETE /tokens/:token` - Revoke authentication token
+- `GET /tokens/stats` - Get token statistics (monitoring)
+
+**Artwork Endpoints:**
+- `POST /artworks` - Upload artwork with multiple file variants (requires auth: token or session)
 - `GET /artworks/:id` - Stream artwork file (use `?variant=` query param)
 - `GET /artworks/:id/mask` - Stream grayscale mask file in SAC v1 format
 - `GET /artworks/:id/metadata` - Get artwork metadata
-- `GET /artworks` - Search artworks (supports artist, tags, text queries)
+- `GET /artworks/:id/variants` - Get available variant information
+- `GET /artworks/:id/download` - Download artwork with attachment headers
+- `GET /artworks/:id/download-url` - Generate temporary download URLs
+- `GET /artworks` - Search artworks (supports artist, tags, text queries, userId)
+- `GET /artworks/me` - Get artworks uploaded by authenticated user (requires session auth)
 - `GET /artworks/check-exists` - Check if artwork already exists (supports id, checksum, title+artist, tags)
+- `POST /artworks/batch` - Retrieve multiple artworks by IDs
+
+**System Endpoints:**
 - `GET /health` - Comprehensive health check with component diagnostics (MongoDB, GridFS, hash storage, system metrics)
 
 **Complete API Documentation**: See `API.md` for detailed endpoint specifications, examples, and usage patterns.
