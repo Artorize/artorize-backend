@@ -28,9 +28,13 @@ curl http://localhost:3000/artworks/{id}?variant=original
 
 ## Authentication
 
-The backend uses **token-based authentication** for secure processor integration.
+The backend supports **two authentication methods**:
 
-### How It Works
+### 1. Token-Based Authentication (Processor Integration)
+
+Used for secure processor uploads in the Artorize architecture.
+
+**How It Works**:
 
 1. **Router generates a token** via `POST /tokens` endpoint
 2. **Router passes token to both processor and backend**
@@ -38,21 +42,38 @@ The backend uses **token-based authentication** for secure processor integration
 4. **Token is consumed** (single-use) on first successful upload
 5. **Expired/used tokens are rejected** with 401 status
 
-### Security Benefits
-
+**Security Benefits**:
 - **One-time tokens**: Each token can only be used once, preventing replay attacks
 - **Time-limited**: Tokens expire after 1 hour (configurable)
 - **Per-artwork isolation**: Compromised token affects only one artwork
-- **No static credentials**: Eliminates risk of leaked API keys destroying everything
+- **No static credentials**: Eliminates risk of leaked API keys
+
+### 2. Session-Based Authentication (User Authentication)
+
+Used for user-specific operations when accessed via the router with Better Auth integration.
+
+**How It Works**:
+
+1. **User authenticates via router** using Better Auth (Google/GitHub OAuth)
+2. **Router sets session cookie** (`better-auth.session_token`)
+3. **Router forwards user info** via custom headers (`X-User-Id`, `X-User-Email`, `X-User-Name`)
+4. **Backend validates session** and associates artworks with user
+
+**User-Specific Features**:
+- Artworks are automatically associated with the authenticated user
+- Users can retrieve only their own artworks via `/artworks/me`
+- Search can be filtered by user ID
 
 ### Protected Endpoints
 
-- `POST /artworks` - **Requires authentication** (token is consumed)
+- `POST /artworks` - **Requires authentication** (token or session)
+- `GET /artworks/me` - **Requires user authentication** (session only)
 
 ### Public Endpoints
 
 All read endpoints remain public:
-- `GET /artworks/*` - Search, metadata, file streaming
+- `GET /artworks` - Search (can optionally filter by userId)
+- `GET /artworks/{id}/*` - Metadata, file streaming
 - `GET /health` - Health checks
 
 ---
@@ -315,6 +336,7 @@ Upload artwork with multiple file variants.
 ```json
 {
   "id": "60f7b3b3b3b3b3b3b3b3b3b3",
+  "userId": "user-uuid-from-session",
   "formats": {
     "original": {
       "contentType": "image/jpeg",
@@ -327,6 +349,8 @@ Upload artwork with multiple file variants.
   }
 }
 ```
+
+**Note**: The `userId` field is only included if the upload was authenticated with a user session. For token-based uploads (processor), this field will be `null`.
 
 **Important**: The `id` field in the response is a MongoDB ObjectId that **must be used by the processor in callbacks** to the router. This allows the router to retrieve artwork files using other endpoints.
 
@@ -371,6 +395,7 @@ Complete artwork metadata.
   "tags": ["tag1", "tag2"],
   "createdAt": "2023-07-20T15:30:00Z",
   "uploadedAt": "2023-07-21T09:15:00Z",
+  "userId": "user-uuid",
   "formats": {
     "original": {
       "contentType": "image/jpeg",
@@ -385,6 +410,8 @@ Complete artwork metadata.
   "extra": { /* Additional metadata */ }
 }
 ```
+
+**Note**: The `userId` field will be `null` for artworks uploaded via token-based authentication (processor).
 
 ---
 
@@ -443,6 +470,7 @@ Search artworks.
 - `artist` (120 chars max) - Filter by artist
 - `q` (200 chars max) - Full-text search (title/description)
 - `tags` - Comma-separated tags
+- `userId` (100 chars max) - Filter by user ID
 - `limit` (1-10000, default: 20) - Results per page
 - `skip` (0-5000, default: 0) - Pagination offset
 
@@ -460,6 +488,43 @@ Search artworks.
   }
 ]
 ```
+
+---
+
+### `GET /artworks/me`
+Get artworks uploaded by the authenticated user.
+
+**Authentication**: Required (session-based only)
+**Headers**:
+- `Cookie: better-auth.session_token=...` (set by router)
+- `X-User-Id: <user-id>` (forwarded by router)
+
+**Query Parameters**:
+- `limit` (1-100, default: 20) - Results per page
+- `skip` (0-5000, default: 0) - Pagination offset
+
+**Response**: `200 OK`
+```json
+{
+  "artworks": [
+    {
+      "_id": "60f7b3b3b3b3b3b3b3b3b3b3",
+      "title": "Artwork Title",
+      "artist": "Artist Name",
+      "description": "Description...",
+      "tags": ["tag1", "tag2"],
+      "createdAt": "2023-07-20T15:30:00Z",
+      "uploadedAt": "2023-07-21T09:15:00Z",
+      "userId": "user-uuid"
+    }
+  ],
+  "total": 15,
+  "userId": "user-uuid"
+}
+```
+
+**Errors**:
+- `401` - Not authenticated or user ID not found in session
 
 ---
 

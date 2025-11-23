@@ -5,6 +5,7 @@ const {
   getArtworkStream,
   getArtworkMetadata,
   search,
+  getMyArtworks,
   getArtworkVariants,
   getBatchArtworks,
   getArtworkDownloadUrl,
@@ -99,6 +100,7 @@ router.post(
 // Read endpoints
 router.get('/', validateRequest(artworkSearchSchema), search);
 router.get('/check-exists', validateRequest(checkExistsSchema), checkExists);
+router.get('/me', authenticate({ required: true }), getMyArtworks);
 router.post('/batch', validateRequest(batchArtworksSchema), getBatchArtworks);
 router.get(
   '/:id',

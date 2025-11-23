@@ -3,6 +3,7 @@ const {
   getArtworkById,
   searchArtworks,
   getArtworksByIds,
+  getArtworksByUser,
   checkArtworkExists,
 } = require('../services/artwork.service');
 const {
@@ -69,6 +70,9 @@ async function uploadArtwork(req, res, next) {
       body.hashes = parseHashes(body.hashes);
     }
 
+    // Extract userId from authenticated user (if available)
+    const userId = req.user?.id || req.auth?.userId || null;
+
     const document = await createArtwork({
       originalFile,
       protectedFile,
@@ -76,11 +80,13 @@ async function uploadArtwork(req, res, next) {
       analysisJson: parseJsonFile(analysisFile, 'analysis'),
       summaryJson: parseJsonFile(summaryFile, 'summary'),
       body,
+      userId,
     });
 
     res.status(201).json({
       id: document._id,
       formats: document.formats,
+      userId: document.userId,
     });
   } catch (error) {
     req.log.error({ err: error }, 'Failed to upload artwork');
@@ -160,12 +166,41 @@ async function search(req, res, next) {
       artist: req.query.artist,
       tags,
       text: req.query.q,
+      userId: req.query.userId,
       limit,
       skip,
     });
     res.json(results);
   } catch (error) {
     req.log.error({ err: error, query: req.query }, 'Failed to search artworks');
+    next(error);
+  }
+}
+
+async function getMyArtworks(req, res, next) {
+  try {
+    // Extract userId from authenticated user
+    const userId = req.user?.id || req.auth?.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        error: 'Authentication required',
+        message: 'User ID not found in authentication context',
+      });
+    }
+
+    const limit = typeof req.query.limit === 'number' ? req.query.limit : 20;
+    const skip = typeof req.query.skip === 'number' ? req.query.skip : 0;
+
+    const artworks = await getArtworksByUser(userId, { limit, skip });
+
+    res.json({
+      artworks,
+      total: artworks.length,
+      userId,
+    });
+  } catch (error) {
+    req.log.error({ err: error }, 'Failed to get user artworks');
     next(error);
   }
 }
@@ -369,6 +404,7 @@ module.exports = {
   getArtworkStream,
   getArtworkMetadata,
   search,
+  getMyArtworks,
   getArtworkVariants,
   getBatchArtworks,
   getArtworkDownloadUrl,
