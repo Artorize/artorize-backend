@@ -6,6 +6,7 @@ async function ensureIndexes() {
     db.collection('artworks_meta').createIndex({ artist: 1, createdAt: -1 }),
     db.collection('artworks_meta').createIndex({ tags: 1 }),
     db.collection('artworks_meta').createIndex({ title: 'text', description: 'text' }),
+    db.collection('artworks_meta').createIndex({ userId: 1, uploadedAt: -1 }, { sparse: true }),
     // Hash indexes for similarity search
     db.collection('artworks_meta').createIndex({ 'hashes.perceptual_hash_int': 1 }),
     db.collection('artworks_meta').createIndex({ 'hashes.average_hash_int': 1 }),

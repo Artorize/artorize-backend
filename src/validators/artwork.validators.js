@@ -71,6 +71,7 @@ const streamQuerySchema = z.object({
 const searchQuerySchema = z.object({
   artist: optionalTrimmedString(120),
   q: optionalTrimmedString(200),
+  userId: optionalTrimmedString(100),
   tags: z
     .preprocess((value) => {
       if (Array.isArray(value)) return value;
