@@ -365,8 +365,11 @@ Comprehensive service health status with component-level diagnostics.
 ### `POST /artworks`
 Upload artwork with multiple file variants.
 
-**Authentication**: Required
-**Header**: `Authorization: Bearer <token>`
+**Authentication**: Required (token or session)
+
+**Headers (choose one authentication method)**:
+- **Token-based**: `Authorization: Bearer <token>` (for processor uploads)
+- **Session-based**: `Cookie: better-auth.session_token=...` + `X-User-Id`, `X-User-Email`, `X-User-Name` (forwarded by router)
 
 **Content-Type**: `multipart/form-data`
 
@@ -409,7 +412,7 @@ Upload artwork with multiple file variants.
 
 **Errors**:
 - `400` - Missing files, invalid types, malformed JSON
-- `401` - Missing/invalid/expired authentication token
+- `401` - Missing/invalid/expired authentication (no token or session)
 - `429` - Rate limit exceeded
 
 ---
@@ -547,10 +550,13 @@ Search artworks.
 ### `GET /artworks/me`
 Get artworks uploaded by the authenticated user.
 
-**Authentication**: Required (session-based only)
-**Headers**:
+**Authentication**: Required (session-based only, NOT token-based)
+
+**Headers** (forwarded by router):
 - `Cookie: better-auth.session_token=...` (set by router)
 - `X-User-Id: <user-id>` (forwarded by router)
+- `X-User-Email: <user-email>` (forwarded by router)
+- `X-User-Name: <user-name>` (forwarded by router)
 
 **Query Parameters**:
 - `limit` (1-100, default: 20) - Results per page
@@ -577,7 +583,7 @@ Get artworks uploaded by the authenticated user.
 ```
 
 **Errors**:
-- `401` - Not authenticated or user ID not found in session
+- `401` - Not authenticated, user ID not found in session, or token-based auth used (session required)
 
 ---
 

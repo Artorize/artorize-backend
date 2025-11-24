@@ -1,11 +1,21 @@
 const { MongoClient } = require('mongodb');
-const config = require('./env');
 
 let client;
 let database;
+let configLoaded = false;
+
+function getConfig() {
+  if (!configLoaded) {
+    configLoaded = true;
+    return require('./env');
+  }
+  return require('./env');
+}
 
 async function connectMongo() {
   if (database) return database;
+
+  const config = getConfig();
 
   if (!client) {
     client = new MongoClient(config.mongoUri, {
@@ -16,6 +26,16 @@ async function connectMongo() {
   await client.connect();
   database = client.db(config.dbName);
   return database;
+}
+
+/**
+ * Set database connection directly (for testing purposes)
+ * @param {MongoClient} mongoClient - MongoDB client instance
+ * @param {Db} db - MongoDB database instance
+ */
+function setConnection(mongoClient, db) {
+  client = mongoClient;
+  database = db;
 }
 
 function getDb() {
@@ -45,4 +65,5 @@ module.exports = {
   getDb,
   getClient,
   disconnectMongo,
+  setConnection,
 };

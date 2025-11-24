@@ -1,6 +1,7 @@
-const { getDb } = require('./mongo');
+const { getDb, connectMongo } = require('./mongo');
 
 async function ensureIndexes() {
+  await connectMongo();
   const db = getDb();
   await Promise.all([
     db.collection('artworks_meta').createIndex({ artist: 1, createdAt: -1 }),
@@ -20,6 +21,10 @@ async function ensureIndexes() {
     db.collection('auth_tokens').createIndex({ expiresAt: 1 }),
     db.collection('auth_tokens').createIndex({ used: 1, expiresAt: 1 }),
     db.collection('auth_tokens').createIndex({ artworkId: 1 }, { sparse: true }),
+    // Better Auth collections
+    db.collection('user').createIndex({ emailHash: 1 }, { unique: true, sparse: true }),
+    db.collection('user').createIndex({ usernameHash: 1 }, { unique: true, sparse: true }),
+    db.collection('session').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
   ]);
 }
 

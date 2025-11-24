@@ -5,6 +5,7 @@ const {
   getStats,
 } = require('../controllers/tokens.controller');
 const { validateRequest } = require('../middlewares/validateRequest');
+const { requireInternalAuth } = require('../middlewares/internalAuth');
 const {
   generateTokenSchema,
   revokeTokenSchema,
@@ -12,9 +13,10 @@ const {
 
 const router = express.Router();
 
-// Token management endpoints
-router.post('/', validateRequest(generateTokenSchema), generateToken);
-router.delete('/:token', validateRequest(revokeTokenSchema), deleteToken);
-router.get('/stats', getStats);
+// Token management endpoints - require internal service authentication
+// Only the router (trusted internal service) can generate/manage tokens
+router.post('/', requireInternalAuth(), validateRequest(generateTokenSchema), generateToken);
+router.delete('/:token', requireInternalAuth(), validateRequest(revokeTokenSchema), deleteToken);
+router.get('/stats', requireInternalAuth(), getStats);
 
 module.exports = router;
