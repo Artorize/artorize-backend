@@ -8,9 +8,14 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 const { MongoClient, ObjectId } = require('mongodb');
 const sharp = require('sharp');
 
+const crypto = require('crypto');
+
 // Import app after setting test environment
 process.env.NODE_ENV = 'test';
 process.env.LOG_LEVEL = 'silent';
+process.env.APP_ENCRYPTION_KEY = process.env.APP_ENCRYPTION_KEY || crypto.randomBytes(32).toString('base64');
+process.env.BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET || crypto.randomBytes(32).toString('hex');
+process.env.INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || 'test-internal-api-key-123456789012';
 
 describe('Artwork Storage API', () => {
   let app;
@@ -85,8 +90,10 @@ describe('Artwork Storage API', () => {
     delete require.cache[require.resolve('../src/config/env.js')];
     delete require.cache[require.resolve('../src/config/mongo.js')];
 
-    const { connectMongo } = require('../src/config/mongo');
-    await connectMongo();
+    const { connectMongo, setConnection } = require('../src/config/mongo');
+
+    // Set the connection for all services that use getDb()
+    setConnection(mongoClient, db);
 
     // Ensure database indexes
     const { ensureIndexes } = require('../src/config/indexes');
@@ -137,8 +144,15 @@ describe('Artwork Storage API', () => {
       .png()
       .toBuffer();
 
-    // Import app after environment setup
-    app = require('../src/app');
+    // Import and initialize app with Better Auth
+    const { createAuth } = require('../src/auth/betterAuth');
+    const createApp = require('../src/app');
+
+    // Create Better Auth instance
+    const auth = await createAuth(db, mongoClient);
+
+    // Create the Express app
+    app = await createApp(auth);
   });
 
   after(async function() {

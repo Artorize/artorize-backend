@@ -6,9 +6,14 @@ const { MongoClient, ObjectId } = require('mongodb');
 const sharp = require('sharp');
 const { encodeSAC } = require('../src/services/sac-encoder.service');
 
+const crypto = require('crypto');
+
 // Import app after setting test environment
 process.env.NODE_ENV = 'test';
 process.env.LOG_LEVEL = 'silent';
+process.env.APP_ENCRYPTION_KEY = process.env.APP_ENCRYPTION_KEY || crypto.randomBytes(32).toString('base64');
+process.env.BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET || crypto.randomBytes(32).toString('hex');
+process.env.INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || 'test-internal-api-key-123456789012';
 
 describe('Artwork Duplication Check API', () => {
   let app;
@@ -75,12 +80,12 @@ describe('Artwork Duplication Check API', () => {
     await mongoClient.connect();
     db = mongoClient.db('test_check_exists');
 
-    // Clear any cached config and initialize app's MongoDB connection
+    // Clear any cached config and set the connection for all services
     delete require.cache[require.resolve('../src/config/env.js')];
     delete require.cache[require.resolve('../src/config/mongo.js')];
 
-    const { connectMongo } = require('../src/config/mongo');
-    await connectMongo();
+    const { setConnection } = require('../src/config/mongo');
+    setConnection(mongoClient, db);
 
     // Ensure database indexes
     const { ensureIndexes } = require('../src/config/indexes');
@@ -131,8 +136,15 @@ describe('Artwork Duplication Check API', () => {
     }
     testImages.mask = encodeSAC(hiResX, hiResY);
 
-    // Import app after environment setup
-    app = require('../src/app');
+    // Import and initialize app with Better Auth
+    const { createAuth } = require('../src/auth/betterAuth');
+    const createApp = require('../src/app');
+
+    // Create Better Auth instance
+    const auth = await createAuth(db, mongoClient);
+
+    // Create the Express app
+    app = await createApp(auth);
 
     // Create test artworks
     const res1 = await request(app)
