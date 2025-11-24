@@ -36,19 +36,25 @@ Examples:
 
 // Now load heavy dependencies only if we're actually starting the server
 const http = require('http');
-const app = require('./app');
 const config = require('./config/env');
-const { connectMongo, disconnectMongo } = require('./config/mongo');
+const { validateSecureEnv } = require('./config/env-secure');
+const { connectMongo, disconnectMongo, getDb, getClient } = require('./config/mongo');
 const { ensureIndexes } = require('./config/indexes');
 const { cleanupTokens } = require('./services/token.service');
 const logger = require('./config/logger');
 const { performSelfUpdate } = require('./utils/self-update');
+const createApp = require('./app');
+const { createAuth } = require('./auth/betterAuth');
 
 let server;
 let cleanupInterval;
 
 async function start() {
   try {
+    // Validate secure environment variables first
+    validateSecureEnv();
+    logger.info('Secure environment variables validated');
+
     // Perform self-update if enabled
     const autoUpdate = process.env.AUTO_UPDATE !== 'false'; // Default to true
     if (autoUpdate) {
@@ -74,6 +80,10 @@ async function start() {
     }
 
     await connectMongo();
+    const db = getDb();
+    const client = getClient();
+    const auth = await createAuth(db, client);
+
     await ensureIndexes();
 
     // Start token cleanup scheduler (runs every hour)
@@ -94,6 +104,7 @@ async function start() {
       logger.info({ deleted }, 'Initial token cleanup completed');
     }
 
+    const app = await createApp(auth);
     server = http.createServer(app);
     server.listen(config.port, '127.0.0.1', () => {
       logger.info({ port: config.port, host: '127.0.0.1' }, 'artscraper backend listening');

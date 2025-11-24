@@ -2,6 +2,38 @@
 
 Node.js + Express service for ingesting original/protected artwork assets with associated mask layers and JSON summaries, storing media in MongoDB GridFS, and managing searchable metadata.
 
+## Authentication (Better Auth + Mongo)
+
+Better Auth runs in this service, backed by MongoDB via `mongodbAdapter`. Supported flows include email + username + password, Google, and GitHub OAuth.
+
+**Session Management:**
+- Session cookie: `better-auth.session_token` (HttpOnly, Secure in prod, SameSite=Lax)
+- PII (`email`, `username`, `name`) and OAuth tokens are encrypted with AES-256-GCM
+- Hashes (`emailHash`, `usernameHash`) enforce uniqueness
+- Availability check: `GET /auth/check-availability?email=&username=` (hash-based, no auth required)
+- Router proxies OAuth flows: `/auth/oauth/:provider/start` and `/auth/callback/:provider` routes are proxied through the router using `APP_BASE_URL` (defaults to `http://localhost:7000`)
+- Router proxies all `/auth/*` endpoints with cookie passthrough for session management
+
+**Router Integration:**
+This backend mounts all auth routes under `/auth/*`. Your router (Fastify + Better Auth) must proxy these endpoints:
+```
+Router → /auth/* → Backend (this service)
+```
+The router validates user sessions and forwards user context via headers for non-OAuth endpoints.
+- **OAuth Callback URLs** are proxied via the router at `APP_BASE_URL/auth/callback/*` (default: `http://localhost:7000`). Configure OAuth provider redirect URIs to point to the router, not this backend service.
+- OAuth flows (`/auth/signin/google`, `/auth/signin/github`, and callbacks) are entirely proxied through the router; `APP_BASE_URL` defaults to `http://localhost:7000`.
+
+**Required Environment Variables:**
+| Variable | Purpose | Min Length | Example |
+|----------|---------|-----------|---------|
+| `BETTER_AUTH_SECRET` | Secret key for session signing | 32 chars | `your-32-char-secret-key-here` |
+| `APP_ENCRYPTION_KEY` | Base64-encoded encryption key for PII | base64(32 bytes) | `dGVzdC1rZXktNDItY2hhcnMtYmFzZTY0LWVuY29kZWQtaGVyZQ==` |
+| `APP_BASE_URL` | Base URL for callbacks and redirects | — | `http://localhost:7000` (dev), `https://yourdomain.com` (prod) |
+| `GOOGLE_CLIENT_ID` | Google OAuth app ID | — | (from Google Cloud Console) |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth secret | — | (from Google Cloud Console) |
+| `GITHUB_CLIENT_ID` | GitHub OAuth app ID | — | (from GitHub Settings) |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth secret | — | (from GitHub Settings) |
+
 ## Feature Highlights
 
 - [x] Core health endpoint, configuration loading, and graceful shutdown wiring.
