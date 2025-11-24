@@ -6,8 +6,13 @@ const request = require('supertest');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const { MongoClient } = require('mongodb');
 
+const crypto = require('crypto');
+
 process.env.NODE_ENV = 'test';
 process.env.LOG_LEVEL = 'silent';
+process.env.APP_ENCRYPTION_KEY = process.env.APP_ENCRYPTION_KEY || crypto.randomBytes(32).toString('base64');
+process.env.BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET || crypto.randomBytes(32).toString('hex');
+process.env.INTERNAL_API_KEY = process.env.INTERNAL_API_KEY || 'test-internal-api-key-123456789012';
 
 describe('Integration Tests - Complete Workflow', () => {
   let app;
@@ -46,16 +51,14 @@ describe('Integration Tests - Complete Workflow', () => {
 
     mongoClient = new MongoClient(mongoUri);
     await mongoClient.connect();
+    const db = mongoClient.db('test');
 
-    // Clear any cached config and initialize app's MongoDB connection
+    // Clear any cached config and set the connection for all services
     delete require.cache[require.resolve('../src/config/env.js')];
     delete require.cache[require.resolve('../src/config/mongo.js')];
 
-    const { connectMongo } = require('../src/config/mongo');
-    await connectMongo();
-
-    // Wait for connection to be ready
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const { setConnection } = require('../src/config/mongo');
+    setConnection(mongoClient, db);
 
     // Ensure database indexes
     const { ensureIndexes } = require('../src/config/indexes');
@@ -68,8 +71,15 @@ describe('Integration Tests - Complete Workflow', () => {
       await generateTestImages();
     }
 
-    // Load app
-    app = require('../src/app');
+    // Import and initialize app with Better Auth
+    const { createAuth } = require('../src/auth/betterAuth');
+    const createApp = require('../src/app');
+
+    // Create Better Auth instance
+    const auth = await createAuth(db, mongoClient);
+
+    // Create the Express app
+    app = await createApp(auth);
 
     // Load test fixtures
     testData.images = {
