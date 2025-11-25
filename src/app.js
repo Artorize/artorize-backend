@@ -67,29 +67,10 @@ async function createApp(auth) {
     }
   });
 
-  // Mount Better Auth before JSON parsing to let it handle body as needed
+  // Mount Better Auth before JSON parsing - handles all /auth/* routes
   if (auth) {
-    const authHandler = toNodeHandler(auth);
-    const rewriteMap = {
-      '/register': '/sign-up/email',
-      '/login': '/sign-in/email',
-      '/logout': '/sign-out',
-      '/me': '/get-session',
-      // OAuth routes - map to Better Auth's expected paths
-      '/oauth/google/callback': '/callback/google',
-      '/oauth/github/callback': '/callback/github',
-    };
-
-    // Normalize legacy routes to Better Auth defaults and strip /auth prefix
-    app.use('/auth', (req, res, next) => {
-      const [pathPart, queryPart] = req.url.split('?');
-      const mappedPath = rewriteMap[pathPart] || pathPart;
-      const rewritten = `${mappedPath}${queryPart ? `?${queryPart}` : ''}`;
-      req.url = rewritten;
-      req.originalUrl = rewritten;
-      logger.debug({ originalUrl: `/auth${pathPart}`, rewritten }, 'Auth route rewrite');
-      return authHandler(req, res, next);
-    });
+    // Use Better Auth handler directly - basePath is set to /auth in config
+    app.all('/auth/*', toNodeHandler(auth));
   }
 
   app.use(express.json({ limit: '10mb' }));

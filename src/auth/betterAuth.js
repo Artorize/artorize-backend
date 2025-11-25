@@ -23,7 +23,7 @@ async function createAuth(db, client) {
   const isTestEnv = process.env.NODE_ENV === 'test';
 
   // In production/development, validate OAuth credentials and APP_BASE_URL
-  if (!isTestEnv) {
+  if (!isTestEnv && process.env.OAUTH_ENABLED !== 'false') {
     validateOAuthCredentials('Google', process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET);
     validateOAuthCredentials('GitHub', process.env.GITHUB_CLIENT_ID, process.env.GITHUB_CLIENT_SECRET);
     validateAppBaseUrl(); // Validates and returns URL, but we derive it again for flexibility
@@ -46,8 +46,10 @@ async function createAuth(db, client) {
   const githubClientSecret = process.env.GITHUB_CLIENT_SECRET || '';
 
   authInstance = betterAuth({
+    basePath: '/auth',
+    trustedOrigins: ['http://localhost:7000', 'http://localhost:5001', 'https://router.artorizer.com', 'https://backend.artorizer.com'],
     secret: getAuthSecret(),
-    database: mongodbAdapter(db, { client }),
+    database: mongodbAdapter(db),
     emailAndPassword: {
       enabled: true,
     },
