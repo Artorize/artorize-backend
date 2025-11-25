@@ -291,8 +291,16 @@ fi
 
 # Step 11: Start the application
 log_info "Starting Artorize Backend service..."
-systemctl start artorize-backend
+
+# Stop existing service if running (ensures clean restart with new code)
+if systemctl is-active --quiet artorize-backend; then
+    log_info "Stopping existing service for update..."
+    systemctl stop artorize-backend
+fi
+
+systemctl daemon-reload
 systemctl enable artorize-backend
+systemctl start artorize-backend
 
 # Wait a few seconds for the service to start
 sleep 3
