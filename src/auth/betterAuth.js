@@ -35,6 +35,8 @@ async function createAuth(db, client) {
     ? (process.env.APP_BASE_URL || 'http://localhost:7000')
     : validateAppBaseUrl();
 
+  console.log('Better Auth APP_BASE_URL:', appBaseUrl);
+
   const { betterAuth } = await import('better-auth');
   const { mongodbAdapter } = await import('better-auth/adapters/mongodb');
   const { username } = await import('better-auth/plugins/username');
@@ -47,7 +49,8 @@ async function createAuth(db, client) {
 
   authInstance = betterAuth({
     basePath: '/auth',
-    trustedOrigins: ['http://localhost:7000', 'http://localhost:5001', 'https://router.artorizer.com', 'https://backend.artorizer.com'],
+    baseURL: appBaseUrl,
+    trustedOrigins: ['http://localhost:7000', 'http://localhost:5001', 'https://router.artorizer.com', 'https://backend.artorizer.com', 'https://artorizer.com'],
     secret: getAuthSecret(),
     database: mongodbAdapter(db),
     emailAndPassword: {
@@ -57,12 +60,10 @@ async function createAuth(db, client) {
       google: {
         clientId: googleClientId,
         clientSecret: googleClientSecret,
-        redirectUri: `${appBaseUrl}/auth/oauth/google/callback`,
       },
       github: {
         clientId: githubClientId,
         clientSecret: githubClientSecret,
-        redirectUri: `${appBaseUrl}/auth/oauth/github/callback`,
       },
     },
     plugins: [username()],
