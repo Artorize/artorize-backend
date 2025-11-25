@@ -109,9 +109,9 @@ The backend supports **dual authentication**:
 **CRITICAL:** The application binds to `127.0.0.1` (localhost only) in `src/server.js:36-37`. This is a security-first design:
 
 - Application listens on `127.0.0.1:<port>` (not accessible from outside the server)
-- Designed to work behind nginx reverse proxy (configured automatically by deployment script)
+- Designed to work behind the Artorize router (Fastify)
 - **Never** modify the host binding to `0.0.0.0` in production
-- All external access must go through nginx with proper security headers
+- All external access goes through the router
 
 For local development, the service is accessible at `http://localhost:<port>`. For remote access during development, use SSH port forwarding rather than changing the binding.
 
@@ -139,7 +139,7 @@ The following indexes are auto-created on startup:
 - `{ title: 'text', description: 'text' }` for full-text search
 
 ### Security Features
-- **Network binding**: Localhost only (`127.0.0.1`) - must use nginx reverse proxy
+- **Network binding**: Localhost only (`127.0.0.1`) - works behind the Artorize router
 - Rate limiting: 300 requests/15min general, 30 uploads/hour
 - Helmet.js for security headers
 - Multer file size limit: 256MB per file
@@ -200,8 +200,7 @@ The deployment script:
 - Clones repository from GitHub to `/opt/artorize-backend`
 - Creates dedicated application user
 - Sets up systemd service with security hardening
-- Configures Nginx reverse proxy (optional with `--domain`)
-- Creates MongoDB indexes
+- Configures firewall (UFW)
 - Preserves existing configuration during updates
 
 **Environment variables**:
@@ -214,9 +213,5 @@ The deployment script:
 - `--production`: Enable production mode
 - `--skip-system-deps`: Skip system package installation
 - `--skip-mongodb`: Skip MongoDB installation
-- `--skip-nginx`: Skip Nginx setup (**WARNING:** Not recommended for production - application binds to localhost only)
-- `--domain your-domain.com`: Configure Nginx for specific domain (optional, for SSL setup)
 - `--port PORT`: Set custom application port
 - `--app-dir DIR`: Set custom installation directory
-
-**Security Note**: The `--skip-nginx` flag should only be used for local development or when using an alternative reverse proxy. The application binds to `127.0.0.1` and requires a reverse proxy for external access.
