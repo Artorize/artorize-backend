@@ -34,14 +34,12 @@ APP_DIR="${APP_DIR:-/opt/artorize-backend}"
 APP_PORT="${APP_PORT:-5001}"
 MONGODB_VERSION="${MONGODB_VERSION:-7.0}"
 NODE_VERSION="${NODE_VERSION:-20}"
-DOMAIN="${DOMAIN:-}"  # Optional: for nginx setup
 REPO_URL="${REPO_URL:-https://github.com/Artorize/artorize-backend.git}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
 
 # Parse command line arguments
 SKIP_SYSTEM_DEPS=false
 SKIP_MONGODB=false
-SKIP_NGINX=false
 PRODUCTION_MODE=false
 
 while [[ $# -gt 0 ]]; do
@@ -54,17 +52,9 @@ while [[ $# -gt 0 ]]; do
             SKIP_MONGODB=true
             shift
             ;;
-        --skip-nginx)
-            SKIP_NGINX=true
-            shift
-            ;;
         --production)
             PRODUCTION_MODE=true
             shift
-            ;;
-        --domain)
-            DOMAIN="$2"
-            shift 2
             ;;
         --app-dir)
             APP_DIR="$2"
@@ -79,9 +69,7 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  --skip-system-deps    Skip system dependencies installation"
             echo "  --skip-mongodb        Skip MongoDB installation"
-            echo "  --skip-nginx          Skip Nginx installation and configuration"
             echo "  --production          Set up for production environment"
-            echo "  --domain DOMAIN       Domain name for Nginx (optional)"
             echo "  --app-dir DIR         Application directory (default: /opt/artorize-backend)"
             echo "  --port PORT           Application port (default: 5001)"
             echo "  --help                Show this help message"
@@ -290,104 +278,18 @@ EOF
 systemctl daemon-reload
 log_success "Systemd service created"
 
-# Step 10: Install and configure Nginx (if not skipped)
-if [ "$SKIP_NGINX" = false ]; then
-    log_info "Installing and configuring Nginx..."
-
-    if ! command -v nginx &> /dev/null; then
-        apt-get install -y nginx
-    fi
-
-    # Create Nginx configuration
-    NGINX_CONF="/etc/nginx/sites-available/artorize-backend"
-
-    if [ -n "$DOMAIN" ]; then
-        SERVER_NAME="$DOMAIN"
-    else
-        SERVER_NAME="_"
-    fi
-
-    cat > "$NGINX_CONF" <<EOF
-upstream artorize_backend {
-    server 127.0.0.1:$APP_PORT;
-    keepalive 64;
-}
-
-server {
-    listen 80;
-    server_name $SERVER_NAME;
-
-    # Security headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-
-    # Client body size limit (for file uploads)
-    client_max_body_size 256M;
-
-    # Timeouts for large file uploads
-    client_body_timeout 300s;
-    client_header_timeout 300s;
-
-    location / {
-        proxy_pass http://artorize_backend;
-        proxy_http_version 1.1;
-
-        # Headers
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-
-        # Timeouts
-        proxy_connect_timeout 300s;
-        proxy_send_timeout 300s;
-        proxy_read_timeout 300s;
-
-        # Buffering
-        proxy_buffering off;
-        proxy_cache_bypass \$http_upgrade;
-    }
-
-    # Health check endpoint
-    location /health {
-        proxy_pass http://artorize_backend/health;
-        access_log off;
-    }
-}
-EOF
-
-    # Enable site
-    ln -sf "$NGINX_CONF" /etc/nginx/sites-enabled/artorize-backend
-
-    # Remove default site if it exists
-    rm -f /etc/nginx/sites-enabled/default
-
-    # Test configuration
-    nginx -t
-
-    # Restart Nginx
-    systemctl restart nginx
-    systemctl enable nginx
-
-    log_success "Nginx configured and started"
-fi
-
-# Step 11: Configure firewall (UFW)
+# Step 10: Configure firewall (UFW)
 if command -v ufw &> /dev/null; then
     log_info "Configuring firewall..."
     ufw --force enable
     ufw allow 22/tcp
-    ufw allow 80/tcp
-    ufw allow 443/tcp
+    ufw allow $APP_PORT/tcp
     log_success "Firewall configured"
 else
     log_warning "UFW not installed, skipping firewall configuration"
 fi
 
-# Step 12: Start the application
+# Step 11: Start the application
 log_info "Starting Artorize Backend service..."
 systemctl start artorize-backend
 systemctl enable artorize-backend
@@ -404,7 +306,7 @@ else
     exit 1
 fi
 
-# Step 13: Display deployment summary
+# Step 12: Display deployment summary
 echo ""
 echo "═══════════════════════════════════════════════════════════"
 log_success "Deployment completed successfully!"
@@ -428,36 +330,13 @@ echo "  - Status:  systemctl status mongod"
 echo "  - Connect: mongosh"
 echo ""
 
-if [ "$SKIP_NGINX" = false ]; then
-    log_info "Nginx:"
-    echo "  - Status:  systemctl status nginx"
-    echo "  - Config:  /etc/nginx/sites-available/artorize-backend"
-    echo "  - Test:    nginx -t"
-    echo ""
-fi
-
 log_info "Health Check:"
-if [ "$SKIP_NGINX" = false ]; then
-    echo "  curl http://localhost/health"
-else
-    echo "  curl http://localhost:$APP_PORT/health"
-fi
+echo "  curl http://localhost:$APP_PORT/health"
 echo ""
-
-if [ -n "$DOMAIN" ]; then
-    log_info "Domain: http://$DOMAIN"
-    log_warning "For HTTPS, configure SSL with certbot:"
-    echo "  apt-get install -y certbot python3-certbot-nginx"
-    echo "  certbot --nginx -d $DOMAIN"
-    echo ""
-fi
 
 log_info "Next Steps:"
 echo "  1. Review and customize: $APP_DIR/config/runtime.json"
 echo "  2. Seed database: cd $APP_DIR && sudo -u $APP_USER npm run seed:inputdata"
 echo "  3. Monitor logs: journalctl -u artorize-backend -f"
-if [ -n "$DOMAIN" ]; then
-    echo "  4. Set up SSL certificate with certbot"
-fi
 echo ""
 log_success "Happy deploying!"
