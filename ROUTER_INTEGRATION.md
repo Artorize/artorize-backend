@@ -94,8 +94,8 @@ This document describes the integration between the Artorize router (Fastify + B
 
 3. **Reverse Proxy Configuration**
    - Backend binds to `127.0.0.1` (localhost only) for security
-   - Router or nginx MUST act as reverse proxy for external access
-   - All external requests MUST go through proxy
+   - Router MUST act as reverse proxy for external access
+   - All external requests MUST go through the router
 
 ### Endpoint Mapping
 
@@ -287,7 +287,7 @@ The router should be configured to:
 2. **Header Trust**: Backend trusts `X-User-*` headers
    - Only router should be able to reach backend
    - Configure firewall to block direct external access
-   - Use nginx/reverse proxy to strip untrusted headers
+   - Router should strip untrusted headers before forwarding
 
 3. **Token Security**:
    - Tokens are single-use and time-limited

@@ -105,11 +105,8 @@ systemctl status artorize-backend
 # Check MongoDB status
 systemctl status mongod
 
-# Check Nginx status (if installed)
-systemctl status nginx
-
 # Test health endpoint
-curl http://localhost/health
+curl http://localhost:5001/health
 ```
 
 ### 2. Configure Application
@@ -149,27 +146,7 @@ cd /opt/artorize-backend
 sudo -u artorize npm run seed:inputdata
 ```
 
-### 4. Set Up SSL (Production)
-
-For production deployments with a domain, set up SSL with Let's Encrypt:
-
-```bash
-# Install Certbot
-sudo apt-get install -y certbot python3-certbot-nginx
-
-# Obtain and configure SSL certificate
-sudo certbot --nginx -d your-domain.com
-
-# Test automatic renewal
-sudo certbot renew --dry-run
-```
-
-Certbot will automatically:
-- Obtain an SSL certificate
-- Configure Nginx for HTTPS
-- Set up automatic renewal
-
-### 5. Configure MongoDB Authentication (Recommended)
+### 4. Configure MongoDB Authentication (Recommended)
 
 For production, enable MongoDB authentication:
 
@@ -328,26 +305,13 @@ Check MongoDB logs:
 sudo journalctl -u mongod -n 50
 ```
 
-### Nginx Issues
-
-Test Nginx configuration:
-```bash
-sudo nginx -t
-```
-
-View Nginx logs:
-```bash
-sudo tail -f /var/log/nginx/error.log
-sudo tail -f /var/log/nginx/access.log
-```
-
 ### File Upload Issues
 
 If file uploads fail, check:
-1. Client max body size in Nginx: `/etc/nginx/sites-available/artorize-backend`
-2. Disk space: `df -h`
-3. MongoDB GridFS collection: `mongosh` → `use artorize` → `db.fs.files.find()`
-4. Permissions on app directory: `ls -la /opt/artorize-backend`
+1. Disk space: `df -h`
+2. MongoDB GridFS collection: `mongosh` → `use artorize` → `db.fs.files.find()`
+3. Permissions on app directory: `ls -la /opt/artorize-backend`
+4. Application logs: `journalctl -u artorize-backend -n 50`
 
 ## Security Considerations
 
@@ -355,8 +319,7 @@ If file uploads fail, check:
 
 The deployment script configures UFW to allow:
 - SSH (port 22)
-- HTTP (port 80)
-- HTTPS (port 443)
+- Application port (default: 5001)
 
 To restrict SSH access:
 ```bash
@@ -368,8 +331,7 @@ sudo ufw delete allow 22/tcp
 
 **Critical security features:**
 - Application binds to `127.0.0.1` only (not accessible from outside the server)
-- All external access **must** go through nginx reverse proxy
-- Never expose the application port (default: 5001) directly to the internet
+- All external access should go through the Artorize router
 - Never bind to `0.0.0.0` in production
 
 **Verifying security:**
@@ -377,10 +339,6 @@ sudo ufw delete allow 22/tcp
 # Check that application is only listening on localhost
 sudo netstat -tlnp | grep node
 # Should show: 127.0.0.1:5001 (NOT 0.0.0.0:5001)
-
-# Check nginx is listening on public interfaces
-sudo netstat -tlnp | grep nginx
-# Should show: 0.0.0.0:80 and 0.0.0.0:443
 ```
 
 ### MongoDB Security
@@ -393,10 +351,9 @@ sudo netstat -tlnp | grep nginx
 ### Additional Application Security
 
 - Keep Node.js and npm packages updated
-- Use SSL/TLS in production (via nginx)
 - Configure proper CORS settings
-- Review and update security headers in Nginx
 - Enable rate limiting (already configured in application)
+- Use Helmet.js security headers (already configured)
 
 ### Regular Maintenance
 
@@ -424,7 +381,7 @@ mongodump --out=/backup/mongodb-$(date +%Y%m%d)
 Check service health:
 ```bash
 # Application health
-curl http://localhost/health
+curl http://localhost:5001/health
 
 # Resource usage
 htop
@@ -518,9 +475,9 @@ For better performance:
 - Configure appropriate WiredTiger cache size
 - Consider replica sets for high availability
 
-### Nginx
+### Application
 
-Tune for large file uploads:
-- Adjust `client_max_body_size`
-- Configure buffering appropriately
-- Enable gzip compression for API responses
+For better performance:
+- Increase Node.js memory limit in systemd service
+- Use clustering (PM2 or Node.js cluster module)
+- Monitor and optimize slow queries
