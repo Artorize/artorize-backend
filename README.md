@@ -1,4 +1,4 @@
-# Artscraper Storage Backend
+# Artorize Storage Backend
 
 Node.js + Express service for ingesting original/protected artwork assets with associated mask layers and JSON summaries, storing media in MongoDB GridFS, and managing searchable metadata.
 
@@ -41,7 +41,7 @@ The router validates user sessions and forwards user context via headers for non
 - [x] GridFS streaming for originals, variant selection, and structured metadata retrieval.
 - [x] Artist/tag/text search backed by MongoDB indexes.
 - [x] Production hardening: input validation (Zod), rate limiting, security headers (Helmet), structured logging (pino/pino-http), and deploy scripts.
-- [x] Security-first design: binds to localhost only (127.0.0.1), designed to work behind nginx reverse proxy.
+- [x] Security-first design: binds to localhost only (127.0.0.1), designed to work behind the Artorize router.
 
 ## Project Structure
 
@@ -94,15 +94,16 @@ Settings are loaded from `config/runtime.json`. The deployment helper will mater
 
 ## Security Architecture
 
-**IMPORTANT:** This application binds to `127.0.0.1` (localhost only) for security. It is designed to work behind a reverse proxy (nginx) and should **not** be directly exposed to the internet.
+**IMPORTANT:** This application binds to `127.0.0.1` (localhost only) for security. It is designed to work behind the Artorize router (Fastify) which acts as the reverse proxy and handles authentication.
 
-The deployment script automatically configures nginx as a reverse proxy with:
-- Proper security headers
-- Request size limits
-- Rate limiting support
-- SSL/TLS termination (when domain is provided)
+**Key Security Features:**
+- Binds to localhost only - not directly accessible from the internet
+- All external access goes through the router
+- Rate limiting: 300 requests/15min general, 30 uploads/hour
+- Helmet.js security headers
+- Zod input validation
 
-**Do not** bypass nginx or expose the application port directly unless in a controlled development environment.
+For local development, the service is accessible at `http://localhost:<port>`. For remote access during development, use SSH port forwarding.
 
 ## Deployment
 
@@ -114,22 +115,14 @@ Deploy to a fresh Debian 12 server with a single command:
 curl -sSL https://raw.githubusercontent.com/Artorize/artorize-backend/main/deploy.sh | sudo bash -s -- --production
 ```
 
-**With domain (for SSL setup):**
-```bash
-curl -sSL https://raw.githubusercontent.com/Artorize/artorize-backend/main/deploy.sh | sudo bash -s -- --production --domain your-domain.com
-```
-
 **What it does:**
 - Installs Node.js 20, MongoDB 7.0, and system dependencies
 - Clones repository to `/opt/artorize-backend`
 - Creates dedicated application user
 - Sets up systemd service with security hardening
-- Configures Nginx reverse proxy with proper headers
 - Sets up firewall rules
 - Automatically starts all services
 - Preserves existing configuration during updates
-
-**Note:** Domain is optional. It's only needed for SSL certificates or specific hostname routing. Without it, the application will be accessible via IP address or any hostname pointing to your server.
 
 ### Manual Deployment
 
@@ -146,9 +139,6 @@ sudo ./deploy.sh --production
 ```bash
 # Custom port
 sudo ./deploy.sh --production --port 3000
-
-# Skip Nginx (use application port directly)
-sudo ./deploy.sh --production --skip-nginx
 
 # Update existing deployment (skip system dependencies)
 sudo ./deploy.sh --production --skip-system-deps --skip-mongodb
@@ -176,7 +166,7 @@ npm run dev
 
 Configuration will be loaded from `config/runtime.json`. Create it manually or let the deployment script generate a default one.
 
-**Note for local development:** The service binds to `127.0.0.1` and is accessible at `http://localhost:<port>` on the machine where it runs. For remote access during development, use SSH port forwarding or temporarily modify the host binding in `src/server.js` (not recommended for production).
+**Note for local development:** The service binds to `127.0.0.1` and is accessible at `http://localhost:<port>` on the machine where it runs. For remote access during development, use SSH port forwarding.
 
 ### Service Management
 

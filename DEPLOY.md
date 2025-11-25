@@ -1,25 +1,21 @@
 # Deployment Guide
 
-This guide covers deploying the Artorize Backend to a Debian 12 server using the automated deployment script.
+This guide covers deploying the Artorize Storage Backend to a Debian 12 server using the automated deployment script.
 
 ## Security Architecture
 
-**CRITICAL:** This application binds to `127.0.0.1` (localhost only) for security. It **must** be deployed behind nginx (or another reverse proxy) and should **never** be directly exposed to the internet on `0.0.0.0`.
+**CRITICAL:** This application binds to `127.0.0.1` (localhost only) for security. It is designed to work behind the Artorize router (Fastify) which handles authentication and acts as the reverse proxy.
 
 The automated deployment script handles this configuration correctly:
 - Application listens on `127.0.0.1:5001` (localhost only)
-- Nginx reverse proxy listens on `0.0.0.0:80/443` (public)
-- Only nginx is accessible from the internet
-- All external traffic is proxied through nginx with proper security headers
-
-**WARNING:** Do not skip nginx installation (`--skip-nginx`) in production environments. This flag is only for development or when using an alternative reverse proxy.
+- Firewall configured to allow SSH and application port
+- All external access should go through the Artorize router
 
 ## Prerequisites
 
 - Fresh Debian 12 server with root access
 - SSH access to the server
-- Domain name (optional, for production with SSL)
-- **Nginx** (automatically installed by deployment script, **required for production**)
+- Artorize router deployed (for production use)
 
 ## Quick Start
 
@@ -29,11 +25,6 @@ Run directly on your server:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/Artorize/artorize-backend/main/deploy.sh | sudo bash -s -- --production
-```
-
-With domain for SSL:
-```bash
-curl -sSL https://raw.githubusercontent.com/Artorize/artorize-backend/main/deploy.sh | sudo bash -s -- --production --domain your-domain.com
 ```
 
 The script will automatically clone the repository to `/opt/artorize-backend` and set up all services.
@@ -62,9 +53,7 @@ The `deploy.sh` script supports several options:
 Options:
   --skip-system-deps    Skip system dependencies installation
   --skip-mongodb        Skip MongoDB installation
-  --skip-nginx          Skip Nginx installation and configuration
   --production          Set up for production environment
-  --domain DOMAIN       Domain name for Nginx (optional)
   --app-dir DIR         Application directory (default: /opt/artorize-backend)
   --port PORT           Application port (default: 5001)
   --help                Show help message
@@ -72,15 +61,9 @@ Options:
 
 ### Examples
 
-**Full production deployment with domain:**
+**Full production deployment:**
 ```bash
-sudo ./deploy.sh --production --domain api.artorize.com
-```
-
-**Development deployment without Nginx (NOT RECOMMENDED FOR PRODUCTION):**
-```bash
-# Only use this for local development or when using an alternative reverse proxy
-sudo ./deploy.sh --skip-nginx
+sudo ./deploy.sh --production
 ```
 
 **Custom application directory:**
@@ -106,9 +89,8 @@ The automated deployment script performs the following steps:
 7. **Application Setup**: Installs npm dependencies as the application user
 8. **Configuration**: Creates or restores runtime configuration file
 9. **Systemd Service**: Sets up automatic startup and process management with security hardening
-10. **Nginx Setup**: Configures reverse proxy with proper headers (optional)
-11. **Firewall**: Configures UFW to allow HTTP/HTTPS traffic
-12. **Service Start**: Starts and enables the application
+10. **Firewall**: Configures UFW to allow SSH and application port
+11. **Service Start**: Starts and enables the application
 
 ## Post-Deployment Steps
 
