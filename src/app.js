@@ -44,18 +44,27 @@ async function createApp(auth) {
 
       // If result has a redirect URL, send it
       if (result?.url) {
-        // Forward any cookies set by Better Auth (PKCE state, etc.)
-        const setCookies = result.headers?.get?.('set-cookie');
-        if (setCookies) {
-          res.setHeader('set-cookie', setCookies);
+        // Forward ALL cookies set by Better Auth (PKCE state, nonce, etc.)
+        // Must use getSetCookie() to get array of all Set-Cookie headers
+        const setCookies = result.headers?.getSetCookie?.() || [];
+        for (const cookie of setCookies) {
+          res.append('set-cookie', cookie);
         }
         return res.redirect(302, result.url);
       }
 
       // If result is a Response object (redirect)
       if (result instanceof Response) {
+        // Forward all headers
+        const setCookies = result.headers.getSetCookie?.() || [];
+        for (const cookie of setCookies) {
+          res.append('set-cookie', cookie);
+        }
+        // Forward other headers (excluding set-cookie which we handled above)
         result.headers.forEach((value, key) => {
-          res.setHeader(key, value);
+          if (key.toLowerCase() !== 'set-cookie') {
+            res.setHeader(key, value);
+          }
         });
         return res.redirect(result.status, result.headers.get('location') || '/');
       }
