@@ -24,8 +24,9 @@ async function createApp(auth) {
 
   // Mount Better Auth before JSON parsing - handles all /auth/* routes
   if (auth) {
-    // Use Better Auth handler directly - basePath is set to /auth in config
-    app.all('/auth/*', toNodeHandler(auth));
+    // Mount Better Auth at /auth path using app.use for proper middleware handling
+    // Better Auth is configured with basePath: '/auth' and will handle OAuth flows
+    app.use('/auth', toNodeHandler(auth));
   }
 
   app.use(express.json({ limit: '10mb' }));
