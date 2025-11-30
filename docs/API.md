@@ -582,17 +582,6 @@ Get artworks uploaded by the authenticated user.
 }
 ```
 
-**Errors**:
-- `401` - Not authenticated, user ID not found in session, or token-based auth used (session required)
-
----
-
-### `GET /artworks/check-exists`
-Check if artwork already exists.
-
-**Query Parameters** (at least one required):
-- `id` - 24-char hex string
-- `checksum` - 64-char SHA256 hash
 - `title` + `artist` - Combined search
 - `tags` - Comma-separated tags
 
