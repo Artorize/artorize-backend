@@ -104,6 +104,8 @@ The backend supports **dual authentication**:
 
 **IMPORTANT**: The backend does NOT validate `better-auth.session_token` cookies directly. It relies on the router to validate sessions and forward user information via headers. This architecture assumes the router is the only client (enforced by localhost binding).
 
+**Better Auth Session Endpoint**: Better Auth provides a default `/auth/session` endpoint that validates session cookies and returns user and session information. The router should use this endpoint (not custom implementations) to validate user sessions before forwarding requests to protected backend endpoints.
+
 ### Security Architecture
 
 **CRITICAL:** The application binds to `127.0.0.1` (localhost only) in `src/server.js:36-37`. This is a security-first design:
@@ -148,7 +150,11 @@ The following indexes are auto-created on startup:
 
 ### API Endpoints
 
-**Authentication Endpoints:**
+**Better Auth Endpoints (provided by Better Auth library):**
+- `GET /auth/session` - Get current session and user information (validates session cookie)
+- All other Better Auth endpoints are available at `/auth/*` (sign-in, sign-up, OAuth, etc.)
+
+**Backend Authentication Endpoints:**
 - `POST /tokens` - Generate authentication token (for processor uploads)
 - `DELETE /tokens/:token` - Revoke authentication token
 - `GET /tokens/stats` - Get token statistics (monitoring)
