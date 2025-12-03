@@ -3,6 +3,7 @@ const helmet = require('helmet');
 const pinoHttp = require('pino-http');
 
 const authAvailabilityRouter = require('./routes/auth.routes');
+const sessionRouter = require('./routes/session.routes');
 const artworksRouter = require('./routes/artworks.routes');
 const similarityRouter = require('./routes/similarity.routes');
 const tokensRouter = require('./routes/tokens.routes');
@@ -19,8 +20,9 @@ async function createApp(auth) {
   app.use(helmet());
   app.use(generalLimiter);
 
-  // Custom availability route before Better Auth wildcard
+  // Custom routes before Better Auth wildcard
   app.use('/auth/check-availability', authAvailabilityRouter);
+  app.use('/auth', sessionRouter);
 
   // Mount Better Auth before JSON parsing - handles all /auth/* routes
   if (auth) {
