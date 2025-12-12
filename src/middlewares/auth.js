@@ -88,6 +88,8 @@ function authenticate({ consume = true, required = true, userOnly = false } = {}
         metadata: tokenDoc.metadata,
         createdAt: tokenDoc.createdAt,
         authType: 'token',
+        userId: tokenDoc.metadata?.userId || null,
+        userEmail: tokenDoc.metadata?.userEmail || null,
       };
 
       next();

@@ -9,10 +9,20 @@ async function generateToken(req, res) {
   try {
     const { artworkId, expiresIn, metadata } = req.body;
 
+    // Extract user information from headers (forwarded by router)
+    const userId = req.headers['x-user-id'];
+    const userEmail = req.headers['x-user-email'];
+    const userName = req.headers['x-user-name'];
+
     const tokenDoc = await createToken({
       artworkId,
       expiresIn: expiresIn ? parseInt(expiresIn, 10) : undefined,
-      metadata: metadata || {},
+      metadata: {
+        ...metadata,
+        userId,
+        userEmail,
+        userName,
+      },
     });
 
     logger.info(
