@@ -84,7 +84,7 @@ async function validateToken(token, { consume = true } = {}) {
       }
     );
 
-    return result?.value || null;
+    return result || null;
   } else {
     // Just check if token is valid without consuming
     return await collection.findOne(query);

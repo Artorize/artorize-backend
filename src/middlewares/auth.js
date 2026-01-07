@@ -69,7 +69,7 @@ function authenticate({ consume = true, required = true, userOnly = false } = {}
     const token = parts[1];
 
     try {
-      const tokenDoc = await validateToken(token, { consume });
+      const tokenDoc = await validateToken(token, { consume: false });
 
       if (!tokenDoc) {
         if (required) {
@@ -82,15 +82,35 @@ function authenticate({ consume = true, required = true, userOnly = false } = {}
         return next();
       }
 
-      req.auth = {
-        tokenId: tokenDoc._id,
-        artworkId: tokenDoc.artworkId,
-        metadata: tokenDoc.metadata,
-        createdAt: tokenDoc.createdAt,
-        authType: 'token',
-        userId: tokenDoc.metadata?.userId || null,
-        userEmail: tokenDoc.metadata?.userEmail || null,
-      };
+      if (consume) {
+        const consumed = await validateToken(token, { consume: true });
+        if (!consumed) {
+          logger.warn({ path: req.path, token: token.slice(0, 4) + '...' }, 'Token already consumed');
+          return res.status(401).json({
+            error: 'Authentication failed',
+            message: 'Invalid, expired, or already used token',
+          });
+        }
+        req.auth = {
+          tokenId: consumed._id,
+          artworkId: consumed.artworkId,
+          metadata: consumed.metadata,
+          createdAt: consumed.createdAt,
+          authType: 'token',
+          userId: consumed.metadata?.userId || null,
+          userEmail: consumed.metadata?.userEmail || null,
+        };
+      } else {
+        req.auth = {
+          tokenId: tokenDoc._id,
+          artworkId: tokenDoc.artworkId,
+          metadata: tokenDoc.metadata,
+          createdAt: tokenDoc.createdAt,
+          authType: 'token',
+          userId: tokenDoc.metadata?.userId || null,
+          userEmail: tokenDoc.metadata?.userEmail || null,
+        };
+      }
 
       next();
     } catch (error) {
