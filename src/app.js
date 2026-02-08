@@ -7,6 +7,7 @@ const sessionRouter = require('./routes/session.routes');
 const artworksRouter = require('./routes/artworks.routes');
 const similarityRouter = require('./routes/similarity.routes');
 const tokensRouter = require('./routes/tokens.routes');
+const creditsRouter = require('./routes/credits.routes');
 const { healthCheck } = require('./controllers/health.controller');
 const { notFound, errorHandler } = require('./middlewares/errorHandler');
 const { generalLimiter } = require('./middlewares/rateLimit');
@@ -37,6 +38,7 @@ async function createApp(auth) {
   app.get('/health', healthCheck);
 
   app.use('/tokens', tokensRouter);
+  app.use('/credits', creditsRouter);
   app.use('/artworks', artworksRouter);
   app.use('/artworks', similarityRouter);
   app.use(notFound);

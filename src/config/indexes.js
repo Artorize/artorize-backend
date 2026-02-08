@@ -21,6 +21,9 @@ async function ensureIndexes() {
     db.collection('auth_tokens').createIndex({ expiresAt: 1 }),
     db.collection('auth_tokens').createIndex({ used: 1, expiresAt: 1 }),
     db.collection('auth_tokens').createIndex({ artworkId: 1 }, { sparse: true }),
+    // Credit indexes for user credits and usage tracking
+    db.collection('user_credits').createIndex({ userId: 1 }, { unique: true }),
+    db.collection('credit_usage').createIndex({ userId: 1, createdAt: -1 }),
     // Better Auth collections
     db.collection('user').createIndex({ emailHash: 1 }, { unique: true, sparse: true }),
     db.collection('user').createIndex({ usernameHash: 1 }, { unique: true, sparse: true }),
